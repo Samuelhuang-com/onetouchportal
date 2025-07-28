@@ -1,0 +1,17 @@
+<!-- templates/powerbi.html -->
+{% extends "base.html" %} {% block title %}Power BI 報表 - {{ super() }}{%
+endblock %} {% block content %}
+<div class="page-header">
+  <h2>Power BI 報表</h2>
+</div>
+
+<!-- Power BI iframe container -->
+<div class="powerbi-container">
+  <iframe
+    title="Power BI Report"
+    src="https://app.powerbi.com/reportEmbed?reportId=69b01980-f926-46e0-8a0d-5f40ab72046c&autoAuth=true&ctid=6ea87b64-f0cb-4304-93e4-dc1b4d2de431&actionBarEnabled=true"
+    frameborder="0"
+    allowfullscreen="true"
+  ></iframe>
+</div>
+{% endblock %}

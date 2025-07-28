@@ -1,0 +1,52 @@
+<!-- templates/_navbar.html -->
+<nav class="sidebar">
+  <!-- 將頂部和中間內容打包在一起 -->
+  <div class="sidebar-top-content">
+    <!-- 品牌標題區塊 -->
+    <div
+      class="sidebar-brand"
+      style="
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      "
+    >
+      <img
+        src="{{ url_for('static', path='logo.png') }}"
+        alt="Logo"
+        class="logo"
+      /><br />
+      <strong>OneTouch Portal</strong>
+    </div>
+
+    <!-- 主要內容滾動區域 (已移除 sidebar-header) -->
+    <div class="sidebar-scrollable-content">
+      <ul class="sidebar-links">
+        {% for item in nav_items %} {% if not item.admin_only or
+        (item.admin_only and role == 'admin') %}
+        <li>
+          <a
+            href="{{ item.url }}"
+            class="{{ 'active' if item.url == current_path else '' }}"
+          >
+            <span class="icon">{{ item.icon | safe }}</span>
+            {{ item.name }}
+          </a>
+        </li>
+        {% endif %} {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <!-- 頁尾連結, 會被推到最底部 -->
+  <div class="sidebar-footer">
+    <a href="/dashboard">
+      <span class="icon">🏠</span>
+      回首頁
+    </a>
+    <a href="/logout">
+      <span class="icon">🚪</span>
+      登出
+    </a>
+  </div>
+</nav>

@@ -1,0 +1,41 @@
+<!-- templates/dashboard.html -->
+{% extends "base.html" %} {% block title %}主控台 - {{ super() }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h2>主控台</h2>
+</div>
+<div class="welcome-card">
+  <h2>歡迎來到 <strong>國聯</strong> OneTouch Portal！</h2>
+  <p>這是我們的 <strong>內部資訊入口</strong></p>
+  <ul>
+    <li>將逐步發展為 <strong>公司訊息公告與交流平台</strong></li>
+    <li>預計導入 <strong>新人訓練與學習資源</strong></li>
+    <li>系統還有很多可以改進的地方，<strong>期待你的回饋與建議</strong></li>
+  </ul>
+  <p>
+    <strong style="color: red"
+      >「OneTouch」代表我們希望每一次點擊都能直達你需要的資訊</strong
+    >
+  </p>
+</div>
+
+<!-- 全站搜尋引擎 -->
+<div class="search-container">
+  <h3><span class="icon">🔍</span> 全站搜尋</h3>
+  <p>您可以搜尋所有事件內容、員工資訊等。</p>
+  <form action="/search" method="get" class="search-form">
+    <input type="text" name="q" placeholder="請輸入關鍵字..." required />
+    <button type="submit" class="button">搜尋</button>
+  </form>
+</div>
+<p style="margin-top: 2rem">
+  歡迎回來，{{ user }}！請從左側的功能列選擇您要使用的服務。
+</p>
+
+{% if role == 'admin' %}
+<div class="admin-actions">
+  <h3>管理員快速操作</h3>
+  <a href="/events/add" class="button">➕ 新增活動</a>
+  <a href="/users" class="button">👥 帳號管理</a>
+</div>
+{% endif %} {% endblock %}

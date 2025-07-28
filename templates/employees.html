@@ -1,0 +1,60 @@
+{% extends "base.html" %} {% block title %}員工通訊錄 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>員工通訊錄</h2>
+</div>
+<input
+  type="text"
+  id="searchInput"
+  onkeyup="filterTable()"
+  placeholder="🔍 搜尋姓名、職稱、分機..."
+  style="
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+  "
+/>
+<table>
+  <thead>
+    <tr>
+      <th>部級</th>
+      <th>部門</th>
+      <th>組別</th>
+      <th>職稱</th>
+      <th>姓名</th>
+      <th>員工編號</th>
+      <th>英文名</th>
+      <th>公司電子信箱</th>
+      <th>分機號碼</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in records %}
+    <tr>
+      <td>{{ row['部級'] }}</td>
+      <td>{{ row['部門'] }}</td>
+      <td>{{ row['組別'] }}</td>
+      <td>{{ row['職稱'] }}</td>
+      <td>{{ row['姓名'] }}</td>
+      <td>{{ row['員工編號'] }}</td>
+      <td>{{ row['英文名'] }}</td>
+      <td>{{ row['公司電子信箱'] }}</td>
+      <td>{{ row['分機號碼'] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+  function filterTable() {
+    const input = document.getElementById("searchInput");
+    const filter = input.value.toLowerCase();
+    const rows = document.querySelectorAll("table tbody tr");
+    rows.forEach((row) => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(filter) ? "" : "none";
+    });
+  }
+</script>
+{% endblock %}

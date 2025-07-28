@@ -1,0 +1,47 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}OneTouch Portal{% endblock %}</title>
+    <!-- 確保使用 url_for 來生成靜態檔案的路徑 -->
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="app-container">
+      <!-- 引入共用的導覽列 -->
+      {% if user %} {% include '_navbar.html' %} {% endif %}
+
+      <main class="main-content">
+        <header class="header">
+          <!--div class="header-left">
+            <img
+              src="{{ url_for('static', path='logo.png') }}"
+              alt="Logo"
+              class="logo"
+            />
+            <strong>OneTouch Portal</strong>
+          <div-->
+          <!-- 我們將原本右側的資訊移到這裡，並移除連結 -->
+          {% if user %}
+          <div class="header-user-info">
+            <span>歡迎, {{ user }} ({{role}})</span>
+          </div>
+          {% endif %}
+        </header>
+
+        <div class="page-content">
+          <!-- 這裡是子模板內容的插入點 -->
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,24 @@
+{% extends "base.html" %} {% block title %}帳號管理 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>帳號管理</h2>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>帳號</th>
+      <th>名稱</th>
+      <th>角色</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for uid, info in users.items() %}
+    <tr>
+      <td>{{ uid }}</td>
+      <td>{{ info.name }}</td>
+      <td>{{ info.role }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

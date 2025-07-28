@@ -1,0 +1,607 @@
+/* static/style.css */
+
+/* --- 基本與重設 --- */
+html, body {
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9fa;
+    color: #212529;
+    height: 100%;
+    overflow: hidden;
+}
+
+h2, h3 {
+    color: #343a40;
+    font-weight: 700;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* --- 整體佈局 --- */
+.app-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.page-content {
+    flex-grow: 1;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+/* 頂部品牌區塊樣式 (靠左對齊) */
+.sidebar-brand {
+    padding: 20px;
+    display: flex;
+    flex-direction: row; /* 水平排列 */
+    align-items: center;   /* 垂直置中 */
+    border-bottom: 1px solid #495057;
+    flex-shrink: 0;
+}
+
+.sidebar-brand .logo {
+    height: 32px;
+    margin-bottom: 0;
+    margin-right: 2px; /* Logo 和文字的間距 */
+}
+
+
+/* --- 頁首 Header --- */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    background-color: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    flex-shrink: 0;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.header .logo {
+    height: 32px;
+    margin-right: 12px;
+}
+
+.header-user-info {
+    font-size: 0.9em;
+    color: #495057;
+}
+
+
+/* --- 側邊導覽列 Sidebar --- */
+.sidebar {
+    width: 240px;
+    background-color: #343a40;
+    color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* 關鍵：讓子元素上下分散對齊 */
+    flex-shrink: 0;
+    /* align-items: center; */
+}
+
+.sidebar-header {
+    padding: 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #495057;
+}
+
+.sidebar-header svg {
+    margin-right: 12px;
+}
+
+.sidebar-links {
+    list-style-type: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.sidebar-links li a {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    color: #ced4da;
+    transition: background-color 0.2s, color 0.2s;
+    border-left: 4px solid transparent;
+}
+
+.sidebar-links li a:hover {
+    background-color: #495057;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.sidebar-links li a.active {
+    background-color: #007bff;
+    color: #ffffff;
+    font-weight: 500;
+    border-left-color: #80bdff;
+}
+
+.sidebar-links li a .icon {
+    margin-right: 15px;
+    font-size: 1.1em;
+    width: 24px;
+    text-align: center;
+}
+
+
+/* 新增：側邊欄底部的樣式 */
+.sidebar-footer {
+    padding: 10px;
+    border-top: 1px solid #495057;
+}
+
+.sidebar-footer a {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    color: #ced4da;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar-footer a:hover {
+    color: #ffffff;
+    background-color: #495057;
+    text-decoration: none;
+}
+
+.sidebar-footer a .icon {
+    margin-right: 15px;
+    font-size: 1.1em;
+}
+
+/* static/style.css */
+
+/* --- 基本設定 --- */
+body {
+    font-family: 'Noto Sans TC', sans-serif, system-ui;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f7f9;
+    color: #333;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+h2, h3 {
+    color: #2c3e50;
+}
+
+a {
+    color: #3498db;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* --- 整體佈局 --- */
+.app-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.page-content {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto; /* 讓內容區域可以滾動 */
+}
+
+
+/* --- 頁首 Header --- */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    flex-shrink: 0; /* 防止 Header 被壓縮 */
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+}
+
+.header .logo {
+    height: 30px;
+    margin-right: 10px;
+}
+
+.header-right {
+    font-size: 0.9em;
+    color: #555;
+}
+
+.header-right a {
+    margin-left: 8px;
+}
+
+
+/* --- 側邊導覽列 Sidebar --- */
+.sidebar {
+    width: 240px;
+    background-color: #2c3e50;
+    color: #ecf0f1;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0; /* 防止 Sidebar 被壓縮 */
+    transition: width 0.3s;
+}
+
+.sidebar-header {
+    padding: 20px;
+    font-size: 1.2em;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid #34495e;
+}
+
+.sidebar-header svg {
+    margin-right: 10px;
+}
+
+.sidebar ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1;
+}
+
+.sidebar ul li a {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    color: #ecf0f1;
+    transition: background-color 0.2s, color 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.sidebar ul li a .icon {
+    margin-right: 15px;
+    font-size: 1.1em;
+    width: 24px;
+    text-align: center;
+}
+
+.sidebar ul li a:hover {
+    background-color: #34495e;
+    text-decoration: none;
+}
+
+/* 目前頁面的高亮樣式 */
+.sidebar ul li a.active {
+    background-color: #2980b9;
+    color: #ffffff;
+    font-weight: 500;
+    border-left: 3px solid #3498db;
+}
+
+/* --- 頁面通用元素 --- */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.button, button {
+    background-color: #3498db;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.button:hover, button:hover {
+    background-color: #2980b9;
+    text-decoration: none;
+}
+
+/* --- 表格樣式 --- */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background-color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+thead tr {
+    background-color: #f2f2f2;
+}
+
+tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+/* --- 表單樣式 --- */
+form {
+    background: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+form input[type="text"],
+form input[type="password"] {
+    width: calc(100% - 22px);
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* --- 登入頁面特定樣式 --- */
+.login-page-content {
+    display: flex;
+   justify-content: center; 
+/*    align-items: center; */
+    width: 100%;
+    /*height: 50vh; /* 滿版高度 */
+}
+login-container {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f4f7f9;
+}
+
+.login-box {
+    width: 320px;
+    padding: 30px;
+    background: #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    text-align: center;
+}
+.login-box .logo {
+    height: 40px;
+    margin-bottom: 20px;
+}
+
+.page-content {
+    flex-grow: 1;
+    padding: 24px;
+    overflow-y: auto;
+    display: flex; /* 讓內容區塊也成為 flex 容器 */
+    flex-direction: column; /* 讓子元素垂直排列 */
+}
+
+/* --- Power BI 容器樣式 --- */
+.powerbi-container {
+    flex-grow: 1; /* 讓此容器填滿 page-content 的剩餘空間 */
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden; /* 確保 iframe 不會超出邊框 */
+}
+
+.powerbi-container iframe {
+    width: 100%;
+    height: 100%;
+    border: none; /* 移除 iframe 的預設邊框 */
+}
+
+/* --- 其他既有樣式 ... --- */
+/* --- 全站搜尋 (dashboard.html) --- */
+.search-container {
+    background-color: #ffffff;
+    padding: 24px;
+    margin-bottom: 24px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.search-container h3 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.search-container h3 .icon {
+    margin-right: 8px;
+    font-size: 1.2em;
+}
+
+.search-container p {
+    margin-top: 0;
+    margin-bottom: 16px;
+    color: #6c757d;
+}
+
+.search-form {
+    display: flex;
+    gap: 10px;
+}
+
+.search-form input[type="text"] {
+    flex-grow: 1;
+    padding: 12px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.search-form button {
+    flex-shrink: 0;
+}
+
+
+/* --- 搜尋結果頁面 (search_results.html) --- */
+.results-container {
+    display: flex;
+    flex-direction: column;
+    gap: 30px; /* 每個結果分類之間的間距 */
+}
+
+.result-category {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.result-category h3 {
+    padding-bottom: 10px;
+    border-bottom: 2px solid #007bff;
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #0056b3;
+}
+
+.query-highlight {
+    color: #c7254e;
+    background-color: #f9f2f4;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-style: normal;
+}
+
+.no-results {
+    text-align: center;
+    padding: 40px;
+    background-color: #fff;
+    border-radius: 8px;
+}
+
+/* --- 通用按鈕與表格樣式 (結果頁面也會用到) --- */
+.button, button {
+    background-color: #007bff;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1em;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.button:hover, button:hover {
+    background-color: #0056b3;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th, td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+thead tr {
+    background-color: #f2f2f2;
+}
+
+tbody tr:hover {
+    background-color: #f5f5f5;
+}
+
+.welcome-card {
+    background-color: #ffffff;
+    border: 2px solid #e0e0e0;
+    border-radius: 16px;
+    padding: 24px;
+    margin: 20px auto;
+    max-width: 800px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.welcome-card h2 {
+    margin-top: 0;
+    color: #007bff;
+}
+
+.welcome-card ul {
+    padding-left: 20px;
+}
+
+.welcome-card li {
+    margin-bottom: 8px;
+}
+
+/* 請將此段樣式加到您現有的 style.css 檔案中 */
+
+/* --- 通用 Iframe 容器樣式 (適用於 Power BI, Google Sheets 等) --- */
+.iframe-container {
+    flex-grow: 1; /* 讓此容器填滿 page-content 的剩餘空間 */
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    overflow: hidden; /* 確保 iframe 不會超出邊框 */
+}
+
+.iframe-container iframe {
+    width: 100%;
+    height: 100%;
+    border: none; /* 移除 iframe 的預設邊框 */
+}
+
+/* --- 調整 page-content 以配合 iframe --- */
+.page-content {
+    flex-grow: 1;
+    padding: 24px;
+    overflow-y: auto;
+    display: flex; /* 讓內容區塊也成為 flex 容器 */
+    flex-direction: column; /* 讓子元素垂直排列 */
+}

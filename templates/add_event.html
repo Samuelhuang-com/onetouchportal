@@ -1,0 +1,23 @@
+{% extends "base.html" %} {% block title %}新增活動 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>新增活動</h2>
+  <a href="/events" class="button">🔙 返回事件列表</a>
+</div>
+
+<form method="post" action="/events/add">
+  <label for="date">日期：</label>
+  <input type="text" id="date" name="日期" required /><br />
+
+  <label for="name">活動名稱：</label>
+  <input type="text" id="name" name="活動名稱" required /><br />
+
+  <label for="owner">負責人：</label>
+  <input type="text" id="owner" name="負責人" required /><br />
+
+  <label for="location">地點：</label>
+  <input type="text" id="location" name="地點" required /><br />
+
+  <button type="submit">新增</button>
+</form>
+{% endblock %}

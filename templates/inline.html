@@ -1,0 +1,33 @@
+<!-- templates/inline.html -->
+{% extends "base.html" %} {% block title %}Google Sheet 資料 - {{ super() }}{%
+endblock %} {% block content %}
+<div class="page-header">
+  <h2>Google Sheet 資料</h2>
+</div>
+
+{% if sheet_data %}
+<table>
+  <thead>
+    <tr>
+      <!-- 動態生成表格標頭 -->
+      {% for header in sheet_headers %}
+      <th>{{ header }}</th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    <!-- 動態生成表格內容 -->
+    {% for row in sheet_data %}
+    <tr>
+      {% for key in sheet_headers %}
+      <td>{{ row[key] }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="no-results">
+  <p>無法載入 Google Sheet 資料，請檢查後端日誌或確認網址是否正確。</p>
+</div>
+{% endif %} {% endblock %}

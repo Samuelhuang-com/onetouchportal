@@ -1,0 +1,12 @@
+{
+  "a12345": {
+    "name": "王小明",
+    "password": "1234",
+    "role": "admin"
+  },
+  "b6789": {
+    "name": "李小美",
+    "password": "1234",
+    "role": "staff"
+  }
+}

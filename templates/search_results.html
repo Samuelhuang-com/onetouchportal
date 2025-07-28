@@ -1,0 +1,75 @@
+<!-- templates/search_results.html -->
+{% extends "base.html" %} {% block title %}搜尋結果 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>搜尋 “<span class="query-highlight">{{ query }}</span>” 的結果</h2>
+</div>
+
+<div class="results-container">
+  {% if not event_results and not employee_results %}
+  <div class="no-results">
+    <p>找不到與 “<strong>{{ query }}</strong>” 相關的任何結果。</p>
+    <a href="/dashboard" class="button">返回主控台</a>
+  </div>
+  {% else %}
+  <!-- 事件搜尋結果 -->
+  {% if event_results %}
+  <div class="result-category">
+    <h3>在「事件列表」中找到 {{ event_results|length }} 筆結果</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>活動名稱</th>
+          <th>負責人</th>
+          <th>地點</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in event_results %}
+        <tr>
+          <td>{{ event['日期'] }}</td>
+          <td>
+            {% if event['網址'] %}
+            <a href="{{ event['網址'] }}" target="_blank"
+              >{{ event['活動名稱'] }}</a
+            >
+            {% else %} {{ event['活動名稱'] }} {% endif %}
+          </td>
+          <td>{{ event['負責人'] }}</td>
+          <td>{{ event['地點'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- 員工搜尋結果 -->
+  {% if employee_results %}
+  <div class="result-category">
+    <h3>在「員工通訊錄」中找到 {{ employee_results|length }} 筆結果</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>姓名</th>
+          <th>部門</th>
+          <th>職稱</th>
+          <th>分機號碼</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for employee in employee_results %}
+        <tr>
+          <td>{{ employee['姓名'] }}</td>
+          <td>{{ employee['部門'] }}</td>
+          <td>{{ employee['職稱'] }}</td>
+          <td>{{ employee['分機號碼'] }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %} {% endif %}
+</div>
+{% endblock %}

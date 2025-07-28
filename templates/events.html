@@ -1,0 +1,82 @@
+<!-- templates/events.html -->
+{% extends "base.html" %} {% block title %}公關行銷 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>公關行銷</h2>
+  {% if role == 'admin' %}
+  <a href="/events/add" class="button">➕ 新增活動</a>
+  {% endif %}
+</div>
+
+<!-- 搜尋框 -->
+<input
+  type="text"
+  id="searchInput"
+  onkeyup="filterTable()"
+  placeholder="🔍 搜尋活動名稱、負責人、地點..."
+  style="
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+  "
+/>
+
+{% if events %}
+<table>
+  <thead>
+    <tr>
+      <th>日期</th>
+      <th>活動名稱</th>
+      <th>負責人</th>
+      <th>地點</th>
+      <th>活動截止日</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td>{{ event['日期'] }}</td>
+      <!-- 檢查網址是否存在，若存在則將活動名稱變成連結 -->
+      <td>
+        {% if event['網址'] %}
+        <a
+          href="{{ event['網址'] }}"
+          target="_blank"
+          title="點擊前往：{{ event['網址'] }}"
+        >
+          {{ event['活動名稱'] }}
+        </a>
+        {% else %} {{ event['活動名稱'] }} {% endif %}
+      </td>
+      <td>{{ event['負責人'] }}</td>
+      <td>{{ event['地點'] }}</td>
+      <td>{{ event['活動截止日'] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>目前沒有任何事件。</p>
+{% endif %}
+
+<!-- JavaScript 過濾功能 -->
+<script>
+  function filterTable() {
+    // 獲取搜尋框和輸入的關鍵字
+    const input = document.getElementById("searchInput");
+    const filter = input.value.toLowerCase();
+
+    // 獲取表格的所有資料列
+    const rows = document.querySelectorAll("table tbody tr");
+
+    // 遍歷每一列，如果內容包含關鍵字就顯示，否則隱藏
+    rows.forEach((row) => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(filter) ? "" : "none";
+    });
+  }
+</script>
+{% endblock %}
