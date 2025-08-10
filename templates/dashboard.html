@@ -1,41 +1,287 @@
-<!-- templates/dashboard.html -->
 {% extends "base.html" %} {% block title %}主控台 - {{ super() }}{% endblock %}
 {% block content %}
-<div class="page-header">
-  <h2>主控台</h2>
-</div>
+<!-- 載入儀表盤圖所需的 JavaScript 函式庫 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/justgage/1.4.0/justgage.min.js"></script>
+
+<style>
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 1.5rem;
+  }
+  .dashboard-card {
+    background-color: #fff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+  }
+  .dashboard-card h3 {
+    margin-top: 0;
+    border-bottom: 2px solid #f4f4f4;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  /* KPI 卡片樣式 */
+  .kpi-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .kpi-item {
+    text-align: center;
+  }
+  .kpi-item h4 {
+    margin: 0 0 0.5rem 0;
+    color: #555;
+    font-size: 1em;
+  }
+  .progress-bar {
+    width: 100%;
+    height: 25px;
+    background-color: #e9ecef;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background-color: #007bff;
+    border-radius: 0.375rem;
+    transition: width 0.6s ease;
+  }
+  .progress-bar-text {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: bold;
+    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+  }
+  #gauge {
+    width: 100%;
+    height: 200px;
+  }
+
+  /* --- ★ 新增：公告列表與 Modal 彈跳視窗樣式 --- */
+  .announcement-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .announcement-table tr {
+    border-bottom: 1px solid #eee;
+  }
+  .announcement-table td {
+    padding: 0.8rem 0.2rem;
+  }
+  .announcement-title-link {
+    font-weight: bold;
+    color: #337ab7;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .announcement-title-link:hover {
+    text-decoration: underline;
+  }
+
+  /* Modal 彈跳視窗背景 */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: none; /* 預設隱藏 */
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+  /* Modal 內容框 */
+  .modal-content {
+    background-color: #fff;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    width: 90%;
+    max-width: 700px;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+  }
+  /* Modal 關閉按鈕 */
+  .modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 2rem;
+    font-weight: bold;
+    color: #aaa;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .modal-close:hover {
+    color: #000;
+  }
+  .modal-header h2 {
+    margin-top: 0;
+    color: #337ab7;
+  }
+  .modal-body {
+    margin-top: 1rem;
+    line-height: 1.6;
+  }
+  .modal-meta {
+    font-size: 0.85em;
+    color: #888;
+    margin-top: 1.5rem;
+    border-top: 1px solid #eee;
+    padding-top: 1rem;
+  }
+</style>
+
 <div class="welcome-card">
   <h2>歡迎來到 <strong>國聯</strong> OneTouch Portal！</h2>
-  <p>這是我們的 <strong>內部資訊入口</strong></p>
-  <ul>
-    <li>將逐步發展為 <strong>公司訊息公告與交流平台</strong></li>
-    <li>預計導入 <strong>新人訓練與學習資源</strong></li>
-    <li>系統還有很多可以改進的地方，<strong>期待你的回饋與建議</strong></li>
-  </ul>
-  <p>
-    <strong style="color: red"
-      >「OneTouch」代表我們希望每一次點擊都能直達你需要的資訊</strong
-    >
-  </p>
 </div>
 
-<!-- 全站搜尋引擎 -->
-<div class="search-container">
-  <h3><span class="icon">🔍</span> 全站搜尋</h3>
-  <p>您可以搜尋所有事件內容、員工資訊等。</p>
-  <form action="/search" method="get" class="search-form">
-    <input type="text" name="q" placeholder="請輸入關鍵字..." required />
-    <button type="submit" class="button">搜尋</button>
-  </form>
-</div>
-<p style="margin-top: 2rem">
-  歡迎回來，{{ user }}！請從左側的功能列選擇您要使用的服務。
-</p>
+<div class="dashboard-grid">
+  <!-- 左側 KPI 卡片 -->
+  <div class="dashboard-card">
+    <h3>📊 關鍵績效指標 (KPIs)</h3>
+    <div class="kpi-container">
+      <!-- 當日營收進度條 -->
+      <div class="kpi-item">
+        <h4>今日營收進度</h4>
+        {% set day_progress = (kpis.today_revenue / kpis.daily_budget * 100) if
+        kpis.daily_budget else 0 %}
+        <div class="progress-bar">
+          <div
+            class="progress-bar-fill"
+            style="width: {{ day_progress | round(2) }}%;"
+          ></div>
+          <div class="progress-bar-text">
+            {{ kpis.today_revenue | number }} / {{ kpis.daily_budget | number }}
+          </div>
+        </div>
+      </div>
+      <!-- 本月達成率儀表盤 -->
+      <div class="kpi-item">
+        <h4>本月營收達成率</h4>
+        <div id="gauge"></div>
+      </div>
+    </div>
+  </div>
 
-{% if role == 'admin' %}
-<div class="admin-actions">
-  <h3>管理員快速操作</h3>
-  <a href="/events/add" class="button">➕ 新增活動</a>
-  <a href="/users" class="button">👥 帳號管理</a>
+  <!-- 右側公告卡片 -->
+  <div class="dashboard-card">
+    <h3>📢 最新公告</h3>
+    {% if announcements %}
+    <table class="announcement-table">
+      <tbody>
+        {% for ann in announcements %}
+        <tr>
+          <td>
+            <!-- ★ 核心修正：按鈕只儲存公告的 ID -->
+            <a
+              class="announcement-title-link view-announcement-btn"
+              data-id="{{ ann.id }}"
+            >
+              {{ ann.title }}
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p>目前沒有任何公告。</p>
+    {% endif %}
+  </div>
 </div>
-{% endif %} {% endblock %}
+
+<!-- Modal 彈跳視窗的 HTML 結構 (維持不變) -->
+<div id="announcement-modal" class="modal-overlay">
+  <div class="modal-content">
+    <span id="modal-close-btn" class="modal-close">&times;</span>
+    <div class="modal-header">
+      <h2 id="modal-title"></h2>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-meta" class="modal-meta"></div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    // --- 儀表盤圖邏輯 (維持不變) ---
+    var mtd_rate = {{ (kpis.mtd_achievement_rate * 100) | round(2) }};
+    var g = new JustGage({
+      id: "gauge", value: mtd_rate, min: 0, max: 100, title: " ", label: "%",
+      levelColors: ["#ff0000", "#f9c802", "#a9d70b"],
+      formatNumber: true, decimals: 2, humanFriendlyDecimal: 2
+    });
+
+    // --- ★ 核心修正：Modal 彈跳視窗邏輯 ---
+
+    // 1. 將後端傳來的完整公告資料，儲存在 JavaScript 變數中
+    //    使用 tojson 過濾器可以安全地將 Python 物件轉換為 JSON 字串
+    const announcementsData = {{ announcements | tojson }};
+
+    const modal = document.getElementById('announcement-modal');
+    const modalCloseBtn = document.getElementById('modal-close-btn');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalMeta = document.getElementById('modal-meta');
+    const viewButtons = document.querySelectorAll('.view-announcement-btn');
+
+    // 2. 為所有公告標題加上點擊事件
+    viewButtons.forEach(button => {
+      button.addEventListener('click', function(event) {
+        event.preventDefault();
+        // 3. 從按鈕取得公告的 ID
+        const announcementId = parseInt(this.dataset.id, 10);
+
+        // 4. 根據 ID 從我們儲存的完整資料中找到對應的公告
+        const announcement = announcementsData.find(ann => ann.id === announcementId);
+
+        if (announcement) {
+          // 5. 將找到的資料填入 Modal
+          modalTitle.textContent = announcement.title;
+          modalBody.innerHTML = announcement.content; // 使用 innerHTML 來渲染 HTML 格式
+          const timestamp = announcement.timestamp.split('T')[0];
+          modalMeta.textContent = `由 ${announcement.author} 發布於 ${timestamp}`;
+
+          // 顯示 Modal
+          modal.style.display = 'flex';
+        }
+      });
+    });
+
+    // 關閉 Modal 的函式
+    function closeModal() {
+      modal.style.display = 'none';
+    }
+
+    // 點擊關閉按鈕時，關閉 Modal
+    modalCloseBtn.addEventListener('click', closeModal);
+
+    // 點擊 Modal 背景遮罩時，也關閉 Modal
+    modal.addEventListener('click', function(event) {
+      if (event.target === modal) {
+        closeModal();
+      }
+    });
+  });
+</script>
+
+{% endblock %}

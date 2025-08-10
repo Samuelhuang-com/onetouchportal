@@ -1,0 +1,151 @@
+{% extends "base.html" %} {% block title %}營業日誌 - {{ super() }}{% endblock
+%} {% block content %}
+<style>
+  .responsive-table {
+    overflow-x: auto;
+    width: 100%;
+    margin-top: 1rem;
+    border-collapse: collapse;
+  }
+  .responsive-table th,
+  .responsive-table td {
+    white-space: nowrap;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+  }
+  .form-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  @media (max-width: 600px) {
+    .form-inline {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
+
+<div class="page-header">
+  <h2>📄 營業日誌報表</h2>
+</div>
+本月預算/天數    2,800,000&nbsp;&nbsp;    每日營收預算 93,500 &nbsp;&nbsp;
+本月酒水預算/天數  200,000&nbsp;&nbsp;    每日酒水預算  6,500 
+
+<form method="get" action="/report" class="form-inline">
+  <label for="date"
+    >選擇日期：
+    <input
+      type="date"
+      name="date"
+      id="date"
+      value="{{ request.query_params.date or '' }}"
+      required
+      style="padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px"
+    />
+  </label>
+  <button type="submit" class="button">🔍 查詢</button>
+</form>
+
+{% if report_date %}
+<hr />
+<h3>📅 報表日期：{{ report_date }}　📍{{ branch }}</h3>
+
+<div class="responsive-table">
+  <table>
+    <thead>
+      <tr>
+        <th>餐別</th>
+        <th>來客數</th>
+        <th>餐食收入</th>
+        <th>飲料收入</th>
+        <th>其他收入</th>
+        <th>服務費</th>
+        <th>總收入</th>
+        <th>平均消費</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      <tr>
+        <td>{{ r.Meal }} {{ r.Meal_Chinese }}</td>
+        <td align="right">{{ r.Covers }}</td>
+        <td align="right">{{ r.FoodRev }}</td>
+        <td align="right">{{ r.BevRev }}</td>
+        <td align="right">{{ r.OthersRev }}</td>
+        <td align="right">{{ r.SvcCharge }}</td>
+        <td align="right">{{ r.TotalFB }}</td>
+        <td align="right">{{ r.AvgCheck }}</td>
+      </tr>
+      {% endfor %}
+      <tr style="font-weight: bold; background: #f0f0f0">
+        <td>Total 總計</td>
+        <td align="right">{{ totals.Covers }}</td>
+        <td align="right">{{ totals.FoodRev }}</td>
+        <td align="right">{{ totals.BevRev }}</td>
+        <td align="right">{{ totals.OthersRev }}</td>
+        <td align="right">{{ totals.SvcCharge }}</td>
+        <td align="right">{{ totals.TotalFB }}</td>
+        <td align="right">{{ totals.AvgCheck }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top: 20px">
+  <strong>MTD 月累計收入：</strong>{{ mtd_revenue }}&nbsp;&nbsp;
+    <strong>本月達成率：</strong>{{ rates.mtd_rate | percent }}&nbsp;&nbsp;
+    <p><strong>本月累計達成率：</strong>{{ rates.accumulated_mtd_rate | percent }}</p>&nbsp;&nbsp;
+    <strong>每日達成率：</strong>{{ rates.day_rate | percent }}&nbsp;&nbsp;
+    <strong>酒水達成率：</strong>{{ rates.bev_rate | percent }}
+  </p>
+</div>
+
+<canvas id="revenueChart" height="100"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const ctx = document.getElementById('revenueChart').getContext('2d');
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: {{ chart_data.labels | tojson }},
+    datasets: [
+      {
+        label: '每日總收入',
+        data: {{ chart_data.total | tojson }},
+        borderColor: 'blue',
+        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+        tension: 0.3
+      },
+      {
+        label: '平均消費',
+        data: {{ chart_data.avgcheck | tojson }},
+        borderColor: 'orange',
+        borderDash: [5, 5],
+        yAxisID: 'y1'
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    scales: {
+      y: {
+        title: { display: true, text: '收入 (元)' }
+      },
+      y1: {
+        position: 'right',
+        grid: { drawOnChartArea: false },
+        title: { display: true, text: '平均消費' }
+      }
+    },
+    plugins: {
+      legend: { position: 'bottom' }
+    }
+  }
+});
+</script>
+
+
+{% endif %} {% endblock %}

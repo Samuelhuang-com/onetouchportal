@@ -1,0 +1,89 @@
+{% extends "base.html" %} {% block title %}合約管理 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>合約管理</h2>
+  <div class="actions">
+    <a href="/contracts/add" class="button blue">➕ 新增合約</a>
+    <a href="/contracts/categories" class="button blue">🗂 類別維護</a>
+    <a href="/contracts/room_types" class="button blue">🏷 房型維護</a>
+  </div>
+</div>
+
+{% if contracts %}
+<table class="table striped">
+  <thead>
+    <tr>
+      <th style="width: 40px"></th>
+      <th>公司(中/英)</th>
+      <th>類別</th>
+      <th>期間</th>
+      <th>業務</th>
+      <th>操作</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in contracts %}
+    <tr class="summary-row">
+      <td><button class="expand-btn">+</button></td>
+      <td>{{ c.company_zh }} / {{ c.company_en }}</td>
+      <td>{{ c.category or '-' }}</td>
+      <td>{{ c.start_date }} ~ {{ c.end_date }}</td>
+      <td>{{ c.sales or '-' }}</td>
+      <td>
+        <a href="/contracts/edit/{{ c.id }}" class="button small">✏️ 編輯</a>
+      </td>
+    </tr>
+    <tr class="detail-row" style="display: none; background: #f9f9f9">
+      <td></td>
+      <td colspan="5">
+        <p><strong>聯絡人：</strong>{{ c.contact or '-' }}</p>
+        <p><strong>電話：</strong>{{ c.phone or '-' }}</p>
+        <p><strong>地址：</strong>{{ c.address or '-' }}</p>
+        <p><strong>Email：</strong>{{ c.email or '-' }}</p>
+        <p><strong>稅率：</strong>{{ c.tax_rate or '-' }}%</p>
+        <p><strong>註記：</strong>{{ c.notes or '-' }}</p>
+        <h4>房型明細</h4>
+        {% if c.rooms %}
+        <table class="table inner">
+          <thead>
+            <tr>
+              <th>房型</th>
+              <th>面積</th>
+              <th>每晚價格</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in c.rooms %}
+            <tr>
+              <td>{{ r.type }}</td>
+              <td>{{ r.area }}</td>
+              <td>{{ r.price }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p>無房型資料。</p>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+  // 展開/收合功能
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".expand-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const detailRow = btn.closest("tr").nextElementSibling;
+        const isHidden = detailRow.style.display === "none";
+        detailRow.style.display = isHidden ? "" : "none";
+        btn.textContent = isHidden ? "−" : "+";
+      });
+    });
+  });
+</script>
+{% else %}
+<p>目前沒有任何合約。</p>
+{% endif %} {% endblock %}

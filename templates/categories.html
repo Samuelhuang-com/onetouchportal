@@ -1,0 +1,24 @@
+{% extends "base.html" %} {% block title %}類別維護 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>類別維護</h2>
+  <a href="/contracts" class="button small">← 回合約列表</a>
+</div>
+
+<form method="post" action="/contracts/categories/add" class="form-container">
+  <ul class="list">
+    {% for cat in categories %}
+    <li>{{ cat }}</li>
+    {% endfor %}
+  </ul>
+
+  <div class="form-group">
+    <label>新增類別：</label>
+    <input type="text" name="name" required />
+  </div>
+
+  <div class="form-footer">
+    <button type="submit" class="button large blue">新增</button>
+  </div>
+</form>
+{% endblock %}

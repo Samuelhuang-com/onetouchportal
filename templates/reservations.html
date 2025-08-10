@@ -1,0 +1,98 @@
+{% extends "base.html" %} {% block title %}訂位紀錄 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>📋 訂位紀錄總覽</h2>
+</div>
+
+<!-- 搜尋與切換開關 -->
+<div style="margin-bottom: 20px">
+  <input
+    type="text"
+    id="searchInput"
+    onkeyup="filterTable()"
+    placeholder="🔍 搜尋姓名、電話、地點、狀態等關鍵字..."
+    style="
+      width: 70%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    "
+  />
+  <label style="margin-left: 15px">
+    <input type="checkbox" id="toggleCancelled" onchange="filterTable()" />
+    顯示取消與 No Show 資料
+  </label>
+</div>
+
+<table id="reservationTable">
+  <thead>
+    <tr>
+      <th>地點</th>
+      <th>時間</th>
+      <th>客人姓名</th>
+      <th>人數</th>
+      <th>餐期</th>
+      <th>電話</th>
+      <th>Email</th>
+      <th>狀態</th>
+      <th>來源</th>
+      <th>備註</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% set grouped = {} %} {% for r in reservations %} {% set _ =
+    grouped.setdefault(r.location, []).append(r) %} {% endfor %} {% for
+    location, items in grouped.items() %} {% set counts = {'已入座': 0,
+    '客人保留': 0, '已通知': 0, '未入座': 0, '其他': 0} %} {% for r in items %}
+    {% if r.state not in ['No Show', '客人取消', '餐廳取消'] %} {% if r.state in
+    counts %} {% set _ = counts.update({r.state: counts[r.state] + 1}) %} {%
+    else %} {% set _ = counts.update({'其他': counts['其他'] + 1}) %} {% endif
+    %} {% endif %} {% endfor %} {% for r in items %}
+    <tr
+      class="{% set base = '' %} {% if r.state == '客人取消' %}status-cancelled hidden-cancelled {% elif r.state == '餐廳取消' %}status-restaurant-cancelled hidden-cancelled {% elif r.state == 'No Show' %}status-no-show hidden-cancelled {% elif r.state == '已入座' %}status-seated {% elif r.state == '客人保留' %}status-reserved {% elif r.state == '已通知' %}status-notified {% elif r.state == '未入座' %}status-unseated {% endif %}"
+    >
+      <td>{{ location }}</td>
+      <td>{{ r.rsvTime }}</td>
+      <td>{{ r.partonName }}</td>
+      <td>{{ r.adults }}/{{ r.kids }}</td>
+      <td>{{ r.diningPeriod }}</td>
+      <td>{{ r.phoneNumber }}</td>
+      <td>{{ r.email }}</td>
+      <td>{{ r.state }}</td>
+      <td>{{ r.source }}</td>
+      <td>{{ r.note }}</td>
+    </tr>
+    {% endfor %}
+
+    <tr style="background-color: #f2f2f2; font-weight: bold">
+      <td colspan="10">
+        📌 <strong>{{ location }} 小計：</strong>
+        ✅ 已入座：{{ counts['已入座'] }}、 ⏳ 客人保留：{{ counts['客人保留']
+        }}、 🔔 已通知：{{ counts['已通知'] }}、 🕒 未入座：{{ counts['未入座']
+        }}、 🌀 其他：{{ counts['其他'] }}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+  function filterTable() {
+    const keyword = document.getElementById("searchInput").value.toLowerCase();
+    const showCancelled = document.getElementById("toggleCancelled").checked;
+
+    const rows = document.querySelectorAll("#reservationTable tbody tr");
+
+    rows.forEach((row) => {
+      const isCancelled = row.classList.contains("hidden-cancelled");
+      const text = row.textContent.toLowerCase();
+
+      // 決定是否顯示
+      const matchSearch = text.includes(keyword);
+      const showRow = matchSearch && (showCancelled || !isCancelled);
+
+      row.style.display = showRow ? "" : "none";
+    });
+  }
+</script>
+{% endblock %}

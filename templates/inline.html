@@ -2,8 +2,24 @@
 {% extends "base.html" %} {% block title %}Google Sheet 資料 - {{ super() }}{%
 endblock %} {% block content %}
 <div class="page-header">
-  <h2>Google Sheet 資料</h2>
+  <h2>inline 訂位資料</h2>
 </div>
+
+<!-- 新增的搜尋框 -->
+<input
+  type="text"
+  id="searchInput"
+  onkeyup="filterTable()"
+  placeholder="🔍 在此表格中搜尋..."
+  style="
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+  "
+/>
 
 {% if sheet_data %}
 <table>
@@ -30,4 +46,23 @@ endblock %} {% block content %}
 <div class="no-results">
   <p>無法載入 Google Sheet 資料，請檢查後端日誌或確認網址是否正確。</p>
 </div>
-{% endif %} {% endblock %}
+{% endif %}
+
+<!-- 新增的 JavaScript 過濾功能 -->
+<script>
+  function filterTable() {
+    // 獲取搜尋框和輸入的關鍵字 (並轉換為小寫以便比對)
+    const input = document.getElementById("searchInput");
+    const filter = input.value.toLowerCase();
+
+    // 獲取表格的所有資料列
+    const rows = document.querySelectorAll("table tbody tr");
+
+    // 遍歷每一列，如果內容包含關鍵字就顯示，否則隱藏
+    rows.forEach((row) => {
+      const text = row.textContent.toLowerCase();
+      row.style.display = text.includes(filter) ? "" : "none";
+    });
+  }
+</script>
+{% endblock %}

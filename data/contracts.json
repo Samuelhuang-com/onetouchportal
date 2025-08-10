@@ -1,0 +1,78 @@
+[
+  {
+    "id": "462d5a76-9d7a-49b1-9f10-ddcd637cf58b",
+    "category": "旅行社",
+    "company_zh": "國聯光觀大飯店",
+    "company_en": "國聯光觀大飯店",
+    "contact": "黃金昇",
+    "phone": "0933914892",
+    "address": "光復南路200號",
+    "email": "sam2307@gmail.com",
+    "start_date": "2025-07-01",
+    "end_date": "2025-07-31",
+    "tax_rate": "",
+    "notes": "1111",
+    "sales": "Sam",
+    "rooms": [
+      {
+        "type": "SS",
+        "area": "200",
+        "price": "4500"
+      },
+      {
+        "type": "SS",
+        "area": "",
+        "price": ""
+      }
+    ]
+  },
+  {
+    "id": "6fb02f83-5b49-4b41-acea-1a1e254d84f9",
+    "category": "旅行社",
+    "company_zh": "國聯光觀大飯店",
+    "company_en": "國聯光觀大飯店",
+    "contact": "黃金昇",
+    "phone": "0933914892",
+    "address": "光復南路200號",
+    "email": "samuel.huang@unitedhotel.com.tw",
+    "start_date": "2025-01-01",
+    "end_date": "2025-07-31",
+    "tax_rate": "15.5",
+    "notes": "",
+    "sales": "Sam",
+    "rooms": [
+      {
+        "type": "SS",
+        "area": "100",
+        "price": "4500"
+      }
+    ]
+  },
+  {
+    "id": "37451ac9-100f-42c3-8442-f6c050b2f0cf",
+    "category": "旅行社",
+    "company_zh": "國聯光觀大飯店",
+    "company_en": "國聯光觀大飯店",
+    "contact": "黃金昇",
+    "phone": "0933914892",
+    "address": "光復南路200號",
+    "email": "sam.huang.project@gmail.com",
+    "start_date": "2025-07-23",
+    "end_date": "2025-07-23",
+    "tax_rate": "",
+    "notes": "",
+    "sales": "LLLAAA",
+    "rooms": [
+      {
+        "type": "SS",
+        "area": "121",
+        "price": "12345"
+      },
+      {
+        "type": "DS",
+        "area": "2365",
+        "price": "444"
+      }
+    ]
+  }
+]

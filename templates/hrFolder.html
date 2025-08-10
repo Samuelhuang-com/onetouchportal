@@ -1,0 +1,29 @@
+<!-- templates/hrFolder.html -->
+{% extends "base.html" %} {% block title %}最新班表 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>最新班表</h2>
+</div>
+
+<!-- 如果後端傳來錯誤訊息，就顯示它 -->
+{% if error %}
+<div class="alert alert-danger"><strong>錯誤：</strong> {{ error }}</div>
+{% elif files %}
+<div class="file-list">
+  <ul>
+    <!-- 遍歷後端傳來的檔案列表 -->
+    {% for file in files %}
+    <li>
+      <!-- 每個檔名都是一個連結，點擊後在新分頁開啟 -->
+      <a href="/hr_files/{{ file.url_encoded_name }}" target="_blank">
+        <span class="icon">📄</span> {{ file.name }}
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="no-results">
+  <p>資料夾中沒有找到任何檔案，或所有檔案都不是可支援的格式。</p>
+</div>
+{% endif %} {% endblock %}

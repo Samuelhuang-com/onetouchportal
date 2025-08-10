@@ -32,7 +32,10 @@
           <!-- 我們將原本右側的資訊移到這裡，並移除連結 -->
           {% if user %}
           <div class="header-user-info">
-            <span>歡迎, {{ user }} ({{role}})</span>
+            <!-- span>歡迎, {{ user }} ({{role}})</span-->
+            <span><strong>👋 歡迎回來, {{ user }}! 請從左側的功能列選擇您要使用的服務。</strong></span>
+            
+</p>
           </div>
           {% endif %}
         </header>
@@ -43,5 +46,56 @@
         </div>
       </main>
     </div>
+    <!-- ===== 更新後的 JavaScript 區塊 ===== -->
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const appContainer = document.querySelector(".app-container");
+        const sidebarToggle = document.getElementById("sidebar-toggle");
+
+        // --- 子選單邏輯 (保留) ---
+        const submenuToggles = document.querySelectorAll(
+          ".sidebar .has-submenu > a"
+        );
+        submenuToggles.forEach(function (toggle) {
+          toggle.addEventListener("click", function (event) {
+            // 如果側邊欄是收合的，就不要執行子選單的展開動作
+            if (appContainer.classList.contains("sidebar-collapsed")) {
+              return;
+            }
+            event.preventDefault();
+            const parentLi = this.parentElement;
+            parentLi.classList.toggle("open");
+          });
+        });
+
+        const activeSubmenuLink = document.querySelector(".submenu a.active");
+        if (activeSubmenuLink) {
+          const parentSubmenu = activeSubmenuLink.closest(".has-submenu");
+          if (parentSubmenu) {
+            parentSubmenu.classList.add("open");
+          }
+        }
+
+        // --- 側邊欄收合邏輯 (新增) ---
+        if (sidebarToggle) {
+          // 1. 頁面載入時，檢查 localStorage 是否有已存的狀態
+          if (localStorage.getItem("sidebarCollapsed") === "true") {
+            appContainer.classList.add("sidebar-collapsed");
+          }
+
+          // 2. 監聽按鈕點擊
+          sidebarToggle.addEventListener("click", function (event) {
+            event.preventDefault();
+            appContainer.classList.toggle("sidebar-collapsed");
+
+            // 3. 將新狀態存入 localStorage
+            const isCollapsed =
+              appContainer.classList.contains("sidebar-collapsed");
+            localStorage.setItem("sidebarCollapsed", isCollapsed);
+          });
+        }
+      });
+    </script>
+    <!-- ================================ -->
   </body>
 </html>

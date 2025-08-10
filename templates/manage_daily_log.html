@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}維護營業日誌 - {{ super() }}{% endblock %}
+{% block content %}
+<style>
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        background: #f9f9f9;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .form-grid .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+    .form-grid label {
+        margin-bottom: 5px;
+        font-weight: bold;
+        font-size: 0.9em;
+    }
+    .form-grid input, .form-grid select {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    .form-grid .full-width {
+        grid-column: 1 / -1;
+    }
+    .form-grid .submit-button {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        padding: 10px;
+        cursor: pointer;
+        font-size: 1.1em;
+    }
+</style>
+
+<h3>📝 新增營業日誌紀錄</h3>
+<form action="/daily_log/add" method="post" class="form-grid">
+    <div class="form-group">
+        <label for="date">日期 (Date)</label>
+        <input type="date" id="date" name="Date" required>
+    </div>
+    <div class="form-group">
+        <label for="meal">餐別 (Meal)</label>
+        <select id="meal" name="Meal" required>
+            <option value="Breakfast">Breakfast</option>
+            <option value="Lunch">Lunch</option>
+            <option value="Afternoon Tea">Afternoon Tea</option>
+            <option value="Dinner">Dinner</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="covers">來客數 (Covers)</label>
+        <input type="number" id="covers" name="Covers" value="0" required>
+    </div>
+    <div class="form-group">
+        <label for="foodrev">餐食收入 (FoodRev)</label>
+        <input type="number" id="foodrev" name="FoodRev" value="0" required>
+    </div>
+    <div class="form-group">
+        <label for="bevrev">飲料收入 (BevRev)</label>
+        <input type="number" id="bevrev" name="BevRev" value="0" required>
+    </div>
+    <div class="form-group">
+        <label for="othersrev">其他收入 (OthersRev)</label>
+        <input type="number" id="othersrev" name="OthersRev" value="0" required>
+    </div>
+    <div class="form-group">
+        <label for="svccharge">服務費 (SvcCharge)</label>
+        <input type="number" id="svccharge" name="SvcCharge" value="0" required>
+    </div>
+    <div class="form-group full-width">
+        <button type="submit" class="submit-button">➕ 新增紀錄</button>
+    </div>
+</form>
+
+<hr>
+
+<h3>📋 現有紀錄</h3>
+<div class="responsive-table">
+    <table>
+        <thead>
+            <tr>
+                <th>日期</th>
+                <th>餐別</th>
+                <th>來客數</th>
+                <th>餐食收入</th>
+                <th>飲料收入</th>
+                <th>其他收入</th>
+                <th>服務費</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in records %}
+            <tr>
+                <td>{{ record.Date.strftime('%Y-%m-%d') }}</td>
+                <td>{{ record.Meal }}</td>
+                <td>{{ record.Covers }}</td>
+                <td>{{ record.FoodRev }}</td>
+                <td>{{ record.BevRev }}</td>
+                <td>{{ record.OthersRev }}</td>
+                <td>{{ record.SvcCharge }}</td>
+                <td>
+                    <form action="/daily_log/delete" method="post" style="display:inline;" onsubmit="return confirm('您確定要刪除這筆紀錄嗎？');">
+                        <input type="hidden" name="record_index" value="{{ record.index }}">
+                        <button type="submit" style="background:none; border:none; color:red; cursor:pointer; padding:0; font-size:1.2em;" title="刪除紀錄">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    // 自動填入今天日期
+    document.getElementById('date').valueAsDate = new Date();
+</script>
+
+{% endblock %}

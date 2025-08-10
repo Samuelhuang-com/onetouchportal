@@ -1,0 +1,94 @@
+{% extends "base.html" %} {% block title %}預算管理 - {{ super() }}{% endblock
+%} {% block content %}
+<style>
+  .budget-form-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  .budget-form-container h3 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+  }
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+  .form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+  .form-group input[type="number"] {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1.1em;
+    box-sizing: border-box;
+  }
+  .submit-button {
+    width: 100%;
+    padding: 0.8rem;
+    font-size: 1.1em;
+  }
+  .success-alert {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    padding: 1rem;
+    border-radius: 5px;
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+</style>
+
+<div class="budget-form-container">
+  <h3>💰 設定每月預算</h3>
+
+  {% if success_message %}
+  <div class="success-alert">預算已成功更新！</div>
+  {% endif %}
+
+  <form action="/budgets/update" method="post">
+    <div class="form-group">
+      <label for="mtd_revenue">本月總營收預算</label>
+      <input
+        type="number"
+        id="mtd_revenue"
+        name="mtd_revenue"
+        value="{{ budgets.mtd_revenue }}"
+        required
+      />
+    </div>
+    <div class="form-group">
+      <label for="day_revenue">每日營收預算</label>
+      <input
+        type="number"
+        id="day_revenue"
+        name="day_revenue"
+        value="{{ budgets.day_revenue }}"
+        required
+      />
+    </div>
+    <div class="form-group">
+      <label for="mtd_bev">本月酒水預算</label>
+      <input
+        type="number"
+        id="mtd_bev"
+        name="mtd_bev"
+        value="{{ budgets.mtd_bev }}"
+        required
+      />
+    </div>
+    <div class="form-group">
+            <label for="day_bev">每日酒水預算</label>
+            <input type="number" id="day_bev" name="day_bev" value="{{ budgets.day_bev }}" required>
+    </div>
+    <button type="submit" class="button submit-button">儲存預算</button>
+  </form>
+</div>
+{% endblock %}

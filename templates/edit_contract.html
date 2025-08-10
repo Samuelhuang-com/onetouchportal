@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}編輯合約 - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2>編輯合約</h2>
+  <a href="/contracts" class="button small">← 回合約列表</a>
+</div>
+
+<form method="post" action="/contracts/edit/{{ contract.id }}" class="form-container">
+  <div class="form-group">
+    <label>類別：</label>
+    <select name="category">
+      {% for cat in categories %}
+        <option value="{{ cat }}" {% if cat == contract.category %}selected{% endif %}>{{ cat }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>公司名稱 (中)：</label>
+    <input type="text" name="company_zh" value="{{ contract.company_zh }}" required>
+  </div>
+
+  <div class="form-group">
+    <label>公司名稱 (英)：</label>
+    <input type="text" name="company_en" value="{{ contract.company_en }}">
+  </div>
+
+  <div class="form-group">
+    <label>聯絡人：</label>
+    <input type="text" name="contact" value="{{ contract.contact }}">
+  </div>
+
+  <div class="form-group">
+    <label>電話：</label>
+    <input type="text" name="phone" value="{{ contract.phone }}">
+  </div>
+
+  <div class="form-group">
+    <label>地址：</label>
+    <input type="text" name="address" value="{{ contract.address }}">
+  </div>
+
+  <div class="form-group">
+    <label>電子信箱：</label>
+    <input type="email" name="email" value="{{ contract.email }}">
+  </div>
+
+  <div class="form-group inline-dates">
+    <label>合約期間：</label>
+    <input type="date" name="start_date" value="{{ contract.start_date }}"> ~
+    <input type="date" name="end_date" value="{{ contract.end_date }}">
+  </div>
+
+  <div class="form-group">
+    <label>稅率 (%)：</label>
+    <input type="number" step="0.01" name="tax_rate" value="{{ contract.tax_rate }}">
+  </div>
+
+  <div class="form-group">
+    <label>註記：</label>
+    <textarea name="notes" rows="3">{{ contract.notes }}</textarea>
+  </div>
+
+  <div class="form-group">
+    <label>公司業務：</label>
+    <input type="text" name="sales" value="{{ contract.sales }}">
+  </div>
+
+  <h3>房型明細</h3>
+  <table class="table">
+    <thead>
+      <tr><th>房型</th><th>面積</th><th>每晚價格</th></tr>
+    </thead>
+    <tbody id="rooms-table">
+      {% for r in contract.rooms %}
+      <tr>
+        <td>
+          <select name="room_type">
+            {% for rt in room_types %}
+              <option value="{{ rt }}" {% if rt == r.type %}selected{% endif %}>{{ rt }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><input type="number" name="room_area" value="{{ r.area }}"></td>
+        <td><input type="number" step="0.01" name="room_price" value="{{ r.price }}"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <button type="button" class="button blue small" onclick="addRow()">➕ 新增一筆房型</button>
+
+  <div class="form-footer">
+    <button type="submit" class="button large blue">更新</button>
+  </div>
+</form>
+
+<script>
+  const roomTypeOptions = `{% for rt in room_types %}<option value="{{ rt }}">{{ rt }}</option>{% endfor %}`;
+  function addRow() {
+    const tbody = document.querySelector('#rooms-table');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><select name="room_type">${roomTypeOptions}</select></td>
+      <td><input type="number" name="room_area"></td>
+      <td><input type="number" step="0.01" name="room_price"></td>
+    `;
+    tbody.appendChild(tr);
+  }
+</script>
+{% endblock %}

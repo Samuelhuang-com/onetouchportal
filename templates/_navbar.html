@@ -3,37 +3,51 @@
   <!-- 將頂部和中間內容打包在一起 -->
   <div class="sidebar-top-content">
     <!-- 品牌標題區塊 -->
-    <div
-      class="sidebar-brand"
-      style="
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-      "
-    >
+    <div class="sidebar-brand">
       <img
         src="{{ url_for('static', path='logo.png') }}"
         alt="Logo"
         class="logo"
       /><br />
-      <strong>OneTouch Portal</strong>
+      <strong class="link-name">OneTouch Portal</strong>
     </div>
 
-    <!-- 主要內容滾動區域 (已移除 sidebar-header) -->
+    <!-- 主要內容滾動區域 -->
     <div class="sidebar-scrollable-content">
       <ul class="sidebar-links">
         {% for item in nav_items %} {% if not item.admin_only or
-        (item.admin_only and role == 'admin') %}
+        (item.admin_only and role == 'admin') %} {# 檢查是否有子選單 #} {% if
+        item.sub_items %}
+        <li class="has-submenu">
+          <a href="#">
+            <span class="icon">{{ item.icon | safe }}</span>
+            <span class="link-name">{{ item.name }}</span>
+            <span class="arrow"></span>
+          </a>
+          <ul class="submenu">
+            {% for sub_item in item.sub_items %}
+            <li>
+              <a
+                href="{{ sub_item.url }}"
+                class="{{ 'active' if sub_item.url == current_path else '' }}"
+              >
+                <span class="link-name">{{ sub_item.name }}</span>
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </li>
+        {% else %} {# 沒有子選單的普通項目 #}
         <li>
           <a
             href="{{ item.url }}"
             class="{{ 'active' if item.url == current_path else '' }}"
           >
             <span class="icon">{{ item.icon | safe }}</span>
-            {{ item.name }}
+            <span class="link-name">{{ item.name }}</span>
           </a>
         </li>
-        {% endif %} {% endfor %}
+        {% endif %} {% endif %} {% endfor %}
       </ul>
     </div>
   </div>
@@ -42,11 +56,16 @@
   <div class="sidebar-footer">
     <a href="/dashboard">
       <span class="icon">🏠</span>
-      回首頁
+      <span class="link-name">回首頁</span>
     </a>
     <a href="/logout">
       <span class="icon">🚪</span>
-      登出
+      <span class="link-name">登出</span>
+    </a>
+    <!-- 新增的收合按鈕 -->
+    <a href="#" id="sidebar-toggle" title="收合選單">
+      <span class="icon toggle-icon">↔️</span>
+      <span class="link-name">收合選單</span>
     </a>
   </div>
 </nav>

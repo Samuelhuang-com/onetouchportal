@@ -1,0 +1,240 @@
+{% extends "base.html" %} {% block title %}合約總覽 - {{ super() }}{% endblock
+%} {% block content %}
+<style>
+  .status-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    color: white;
+    font-size: 0.85em;
+    min-width: 60px;
+    text-align: center;
+    display: inline-block;
+  }
+  .expiry-level-critical {
+    background-color: #dc3545;
+  }
+  .expiry-level-warning {
+    background-color: #ffc107;
+    color: #333 !important;
+  }
+  .expiry-level-safe {
+    background-color: #28a745;
+  }
+  .expiry-level-expired {
+    background-color: #6c757d;
+  }
+
+  .filter-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 10px;
+    margin-bottom: 20px;
+    align-items: center;
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+  }
+  .filter-container input,
+  .filter-container select {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+  .filter-container label {
+    font-weight: bold;
+    font-size: 0.9em;
+  }
+  .content-cell {
+    max-width: 300px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>
+
+<div
+  class="page-header"
+  style="display: flex; justify-content: space-between; align-items: center"
+>
+  <h2>合約總覽</h2>
+  <a href="{{ url_for('manage_contracts_page') }}" class="button"
+    >維護合約資料</a
+  >
+</div>
+
+<div class="filter-container">
+  <input
+    type="text"
+    id="searchInput"
+    onkeyup="filterTable()"
+    placeholder="🔍 關鍵字搜尋..."
+    style="flex-grow: 1; min-width: 200px"
+  />
+  <select id="expiryFilter" onchange="filterTable()">
+    <option value="all">所有到期提醒</option>
+    <option value="critical">30天內到期</option>
+    <option value="warning">31-90天到期</option>
+    <option value="safe">90天以上</option>
+    <option value="expired">已過期</option>
+  </select>
+  <label for="filterStartDate">執行中合約期間:</label>
+  <input type="date" id="filterStartDate" onchange="filterTable()" />
+  <span>-</span>
+  <input type="date" id="filterEndDate" onchange="filterTable()" />
+  <button
+    onclick="clearDateFilters()"
+    style="
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+    "
+  >
+    清除日期
+  </button>
+</div>
+
+<div class="responsive-table">
+  <table>
+    <thead>
+      <tr>
+        <th>附件</th>
+        <!-- 新增 -->
+        <th>廠商名稱</th>
+        <th>合約類型</th>
+        <th>合約主旨</th>
+        <th>合約內容</th>
+        <th>狀態</th>
+        <th>合約金額</th>
+        <th>開始日期</th>
+        <th>結束日期</th>
+        <th>到期提醒</th>
+        <th>聯絡人</th>
+        <th>聯絡電話</th>
+      </tr>
+    </thead>
+    <tbody id="contractTableBody">
+      {% for contract in contracts %}
+      <tr
+        data-status="{{ contract.Status }}"
+        data-start-date="{{ contract.StartDate.strftime('%Y-%m-%d') }}"
+        data-end-date="{{ contract.EndDate.strftime('%Y-%m-%d') }}"
+      >
+        <!-- 新增附件連結 -->
+        <td style="text-align: center">
+          {% if contract.attachment_filename %}
+          <a
+            href="{{ url_for('serve_contract_file', file_path=contract.attachment_filename) }}"
+            target="_blank"
+            title="查看附件"
+            style="font-size: 1.5em; text-decoration: none"
+            >📎</a
+          >
+          {% endif %}
+        </td>
+        <td>{{ contract.VendorName or '' }}</td>
+        <td>{{ contract.ContractType or '' }}</td>
+        <td>{{ contract.Subject or '' }}</td>
+        <td class="content-cell">{{ contract.Content or '' }}</td>
+        <td>{{ contract.Status or '' }}</td>
+        <td style="text-align: right">
+          {{ "{:,.0f}".format(contract.Amount) if contract.Amount else 0 }}
+        </td>
+        <td>
+          {{ contract.StartDate.strftime('%Y-%m-%d') if contract.StartDate else
+          '' }}
+        </td>
+        <td>
+          {{ contract.EndDate.strftime('%Y-%m-%d') if contract.EndDate else ''
+          }}
+        </td>
+        <td>
+          <span class="status-badge {{ contract.expiry_level }}">
+            {{ contract.expiry_text }}
+          </span>
+        </td>
+        <td>{{ contract.ContactPerson or '' }}</td>
+        <td>{{ contract.ContactPhone or '' }}</td>
+      </tr>
+      {% else %}
+      <!-- 更新 colspan -->
+      <tr>
+        <td colspan="12" style="text-align: center; padding: 20px">
+          目前沒有任何合約資料。
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+  function filterTable() {
+    // ... (JavaScript 程式碼保持不變)
+    const textFilter = document
+      .getElementById("searchInput")
+      .value.toLowerCase();
+    const expiryFilter = document.getElementById("expiryFilter").value;
+    const filterStartDateStr = document.getElementById("filterStartDate").value;
+    const filterEndDateStr = document.getElementById("filterEndDate").value;
+
+    const tableBody = document.getElementById("contractTableBody");
+    const rows = tableBody.getElementsByTagName("tr");
+
+    for (let i = 0; i < rows.length; i++) {
+      let row = rows[i];
+
+      const textMatch =
+        (row.textContent || row.innerText).toLowerCase().indexOf(textFilter) >
+        -1;
+
+      const badge = row.querySelector(".status-badge");
+      let expiryMatch = false;
+      if (
+        expiryFilter === "all" ||
+        (badge && badge.classList.contains("expiry-level-" + expiryFilter))
+      ) {
+        expiryMatch = true;
+      }
+
+      let dateMatch = false;
+      const dateRangeIsActive = filterStartDateStr || filterEndDateStr;
+
+      if (!dateRangeIsActive) {
+        dateMatch = true;
+      } else {
+        const contractStatus = row.dataset.status;
+        if (contractStatus === "執行中") {
+          const contractStart = new Date(row.dataset.startDate);
+          const contractEnd = new Date(row.dataset.endDate);
+          const filterStart = filterStartDateStr
+            ? new Date(filterStartDateStr)
+            : null;
+          const filterEnd = filterEndDateStr
+            ? new Date(filterEndDateStr)
+            : null;
+
+          const startCondition = filterEnd ? contractStart <= filterEnd : true;
+          const endCondition = filterStart ? contractEnd >= filterStart : true;
+
+          if (startCondition && endCondition) {
+            dateMatch = true;
+          }
+        }
+      }
+
+      if (textMatch && expiryMatch && dateMatch) {
+        row.style.display = "";
+      } else {
+        row.style.display = "none";
+      }
+    }
+  }
+
+  function clearDateFilters() {
+    document.getElementById("filterStartDate").value = "";
+    document.getElementById("filterEndDate").value = "";
+    filterTable();
+  }
+</script>
+{% endblock %}

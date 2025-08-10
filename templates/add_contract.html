@@ -1,0 +1,104 @@
+{% extends "base.html" %} {% block title %}新增合約 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>新增合約</h2>
+  <a href="/contracts" class="button small">← 回合約列表</a>
+</div>
+
+<form method="post" action="/contracts/add" class="form-container">
+  <div class="form-group">
+    <label>類別：</label>
+    <select name="category">
+      {% for cat in categories %}
+      <option value="{{ cat }}">{{ cat }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label>公司名稱 (中)：</label>
+    <input type="text" name="company_zh" required />
+  </div>
+
+  <div class="form-group">
+    <label>公司名稱 (英)：</label>
+    <input type="text" name="company_en" />
+  </div>
+
+  <div class="form-group">
+    <label>聯絡人：</label>
+    <input type="text" name="contact" />
+  </div>
+
+  <div class="form-group">
+    <label>電話：</label>
+    <input type="text" name="phone" />
+  </div>
+
+  <div class="form-group">
+    <label>地址：</label>
+    <input type="text" name="address" />
+  </div>
+
+  <div class="form-group">
+    <label>電子信箱：</label>
+    <input type="email" name="email" />
+  </div>
+
+  <div class="form-group inline-dates">
+    <label>合約期間：</label>
+    <input type="date" name="start_date" /> ~
+    <input type="date" name="end_date" />
+  </div>
+
+  <div class="form-group">
+    <label>稅率 (%)：</label>
+    <input type="number" step="0.01" name="tax_rate" />
+  </div>
+
+  <div class="form-group">
+    <label>註記：</label>
+    <textarea name="notes" rows="3"></textarea>
+  </div>
+
+  <div class="form-group">
+    <label>公司業務：</label>
+    <input type="text" name="sales" />
+  </div>
+
+  <h3>房型明細</h3>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>房型</th>
+        <th>面積</th>
+        <th>每晚價格</th>
+      </tr>
+    </thead>
+    <tbody id="rooms-table">
+      <!-- JS 會動態新增列 -->
+    </tbody>
+  </table>
+  <button type="button" class="button blue small" onclick="addRow()">
+    ➕ 新增一筆房型
+  </button>
+
+  <div class="form-footer">
+    <button type="submit" class="button large blue">儲存</button>
+  </div>
+</form>
+
+<script>
+  const roomTypeOptions = `{% for rt in room_types %}<option value="{{ rt }}">{{ rt }}</option>{% endfor %}`;
+  function addRow() {
+    const tbody = document.querySelector("#rooms-table");
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><select name="room_type">${roomTypeOptions}</select></td>
+      <td><input type="number" name="room_area"></td>
+      <td><input type="number" step="0.01" name="room_price"></td>
+    `;
+    tbody.appendChild(tr);
+  }
+</script>
+{% endblock %}

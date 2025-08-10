@@ -1,0 +1,160 @@
+{% extends "base.html" %} {% block title %}公告管理 - {{ super() }}{% endblock
+%} {% block content %}
+<!-- 1. 載入 Quill.js 的 CSS 樣式表 -->
+<link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet" />
+
+<!-- 2. 載入 Quill.js 的核心程式 -->
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+
+<style>
+  .announcement-form {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+  }
+  .announcement-form .form-group {
+    margin-bottom: 1rem;
+  }
+  .announcement-form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  .announcement-form input[type="text"] {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+  }
+  /* Quill 編輯器的樣式 */
+  #editor {
+    height: 350px;
+    background-color: #fff;
+  }
+  .announcement-list {
+    list-style: none;
+    padding: 0;
+  }
+  .announcement-item {
+    background: #fff;
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+  }
+  .announcement-item-content {
+    flex-grow: 1;
+    word-break: break-word;
+  }
+  .announcement-item-content h4 {
+    margin-top: 0;
+    margin-bottom: 5px;
+    color: #337ab7;
+  }
+  .announcement-item-content .content-body {
+    margin: 0;
+  }
+  .announcement-item-meta {
+    font-size: 0.85em;
+    color: #777;
+    margin-top: 10px;
+  }
+  .announcement-item-actions {
+    flex-shrink: 0;
+  }
+</style>
+
+<h3>📢 發布新公告</h3>
+<div class="announcement-form">
+  <!-- 3. 修改表單，加入 id 以便 JavaScript 選取 -->
+  <form action="/announcements/add" method="post" id="announcement-form">
+    <div class="form-group">
+      <label for="title">標題</label>
+      <input type="text" id="title" name="title" required />
+    </div>
+    <div class="form-group">
+      <label for="content">內容</label>
+      <!-- 4. 這是 Quill 編輯器將會生成的地方 -->
+      <div id="editor"></div>
+      <!-- 5. 新增一個隱藏的 input，用來儲存 Quill 的 HTML 內容並提交給後端 -->
+      <input type="hidden" name="content" id="content-input" />
+    </div>
+    <button type="submit" class="button">發布公告</button>
+  </form>
+</div>
+
+<hr />
+
+<h3>📋 現有公告列表</h3>
+<ul class="announcement-list">
+  {% for ann in announcements %}
+  <li class="announcement-item">
+    <div class="announcement-item-content">
+      <h4>{{ ann.title }}</h4>
+      <div class="content-body">{{ ann.content | safe }}</div>
+      <div class="announcement-item-meta">
+        <span>發布人: {{ ann.author }}</span> |
+        <span
+          >時間: {{ ann.timestamp.split('T')[0] }} {{
+          ann.timestamp.split('T')[1].split('.')[0] }}</span
+        >
+      </div>
+    </div>
+    <div class="announcement-item-actions">
+      <form
+        action="/announcements/delete"
+        method="post"
+        onsubmit="return confirm('您確定要刪除這則公告嗎？');"
+      >
+        <input type="hidden" name="announcement_id" value="{{ ann.id }}" />
+        <button type="submit" class="button-danger" title="刪除公告">🗑️</button>
+      </form>
+    </div>
+  </li>
+  {% else %}
+  <li><p>目前沒有任何公告。</p></li>
+  {% endfor %}
+</ul>
+
+<!-- 6. 初始化 Quill.js 的腳本 -->
+<script>
+  // 定義編輯器的工具列選項
+  var toolbarOptions = [
+    [{ header: [1, 2, 3, 4, 5, 6, false] }],
+    [{ font: [] }],
+    ["bold", "italic", "underline", "strike"], // 粗體、斜體、底線、刪除線
+    [{ color: [] }, { background: [] }], // 文字顏色、背景顏色
+    [{ align: [] }],
+    ["blockquote", "code-block"],
+    [{ list: "ordered" }, { list: "bullet" }],
+    [{ indent: "-1" }, { indent: "+1" }], // 縮排
+    ["link", "image"], // 連結、圖片
+    ["clean"], // 清除格式
+  ];
+
+  // 初始化 Quill 編輯器
+  var quill = new Quill("#editor", {
+    modules: {
+      toolbar: toolbarOptions,
+    },
+    theme: "snow", // 使用 'snow' 這個主題
+  });
+
+  // 監聽表單提交事件
+  var form = document.getElementById("announcement-form");
+  form.onsubmit = function () {
+    // 當使用者點擊「發布公告」時，
+    // 從 Quill 編輯器中取得 HTML 內容
+    var content = document.querySelector(".ql-editor").innerHTML;
+    // 將內容放入我們隱藏的 input 中
+    document.getElementById("content-input").value = content;
+  };
+</script>
+
+{% endblock %}

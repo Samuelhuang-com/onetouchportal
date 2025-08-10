@@ -1,0 +1,19 @@
+{% extends "base.html" %} {% block title %}營業日誌 - {{ super() }}{% endblock
+%} {% block content %}
+<div class="page-header">
+  <h2>選擇報表日期</h2>
+</div>
+
+<form method="post" action="/report" style="margin: 20px 0">
+  <label style="display: inline-block; margin-right: 10px">
+    日期 (YYYY/M/D)：<input
+      type="text"
+      name="date"
+      placeholder="例如：2025/8/2"
+      required
+      style="padding: 6px 8px; border: 1px solid #ced4da; border-radius: 4px"
+    />
+  </label>
+  <button type="submit" class="button">產生報表</button>
+</form>
+{% endblock %}

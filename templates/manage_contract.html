@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}維護合約 - {{ super() }}{% endblock %}
+
+{% block content %}
+<style>
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 15px 20px;
+        background: #f9f9f9;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .form-grid .form-group { display: flex; flex-direction: column; }
+    .form-grid label { margin-bottom: 5px; font-weight: bold; font-size: 0.9em; }
+    .form-grid input, .form-grid select, .form-grid textarea {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    .form-grid .full-width { grid-column: 1 / -1; }
+    .form-grid .submit-button {
+        color: white;
+        border: none;
+        padding: 12px;
+        cursor: pointer;
+        font-size: 1.1em;
+        border-radius: 5px;
+    }
+    .add-button { background-color: #007bff; }
+    .edit-button { background-color: #28a745; }
+    .attachment-info {
+        background-color: #e9ecef;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 0.9em;
+    }
+</style>
+
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <h2>維護合約資料</h2>
+    <a href="{{ url_for('list_contracts') }}" class="button" style="background-color: #6c757d;">返回總覽</a>
+</div>
+
+
+<form action="{{ action_url }}" method="post" class="form-grid" enctype="multipart/form-data">
+    <h3>{% if contract %}編輯合約{% else %}新增合約{% endif %}</h3>
+    <div class="form-group full-width"></div>
+    <div class="form-group">
+        <label for="VendorName">廠商名稱</label>
+        <input type="text" id="VendorName" name="VendorName" value="{{ contract.VendorName or '' }}" required>
+    </div>
+    <div class="form-group">
+        <label for="ContractType">合約類型</label>
+        <input type="text" id="ContractType" name="ContractType" value="{{ contract.ContractType or '' }}" required>
+    </div>
+    
+    <div class="form-group full-width">
+        <label for="Subject">合約主旨</label>
+        <input type="text" id="Subject" name="Subject" value="{{ contract.Subject or '' }}">
+    </div>
+    <div class="form-group full-width">
+        <label for="Content">合約內容</label>
+        <textarea id="Content" name="Content" rows="4">{{ contract.Content or '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="Amount">合約金額</label>
+        <input type="number" id="Amount" name="Amount" value="{{ contract.Amount or 0 }}" required>
+    </div>
+     <div class="form-group">
+        <label for="Status">合約狀態</label>
+        <select id="Status" name="Status" required>
+            <option value="執行中" {% if contract.Status == '執行中' %}selected{% endif %}>執行中</option>
+            <option value="已到期" {% if contract.Status == '已到期' %}selected{% endif %}>已到期</option>
+            <option value="已續約" {% if contract.Status == '已續約' %}selected{% endif %}>已續約</option>
+            <option value="中止" {% if contract.Status == '中止' %}selected{% endif %}>中止</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="StartDate">開始日期</label>
+        <input type="date" id="StartDate" name="StartDate" value="{{ contract.StartDate.strftime('%Y-%m-%d') if contract.StartDate else '' }}" required>
+    </div>
+    <div class="form-group">
+        <label for="EndDate">結束日期</label>
+        <input type="date" id="EndDate" name="EndDate" value="{{ contract.EndDate.strftime('%Y-%m-%d') if contract.EndDate else '' }}" required>
+    </div>
+    <div class="form-group">
+        <label for="ContactPerson">廠商聯絡人</label>
+        <input type="text" id="ContactPerson" name="ContactPerson" value="{{ contract.ContactPerson or '' }}">
+    </div>
+    <div class="form-group">
+        <label for="ContactPhone">聯絡人電話</label>
+        <input type="text" id="ContactPhone" name="ContactPhone" value="{{ contract.ContactPhone or '' }}">
+    </div>
+
+    <!-- ===== 附件欄位 ===== -->
+    <div class="form-group full-width">
+        {% if contract and contract.attachment_filename %}
+            <div class="attachment-info">
+                目前附件: <a href="{{ url_for('serve_contract_file', file_path=contract.attachment_filename) }}" target="_blank">{{ contract.attachment_filename }}</a>
+            </div>
+            <label for="attachment" style="margin-top: 10px;">上傳新檔以替換 (選填)</label>
+        {% else %}
+            <label for="attachment">上傳附件 (選填)</label>
+        {% endif %}
+        <input type="file" id="attachment" name="attachment">
+    </div>
+    <!-- ===================== -->
+
+    <div class="form-group full-width">
+        <label for="Notes">備註</label>
+        <textarea id="Notes" name="Notes" rows="3">{{ contract.Notes or '' }}</textarea>
+    </div>
+    <div class="form-group full-width">
+        {% if contract %}
+        <button type="submit" class="submit-button edit-button">💾 更新資料</button>
+        {% else %}
+        <button type="submit" class="submit-button add-button">➕ 新增合約</button>
+        {% endif %}
+    </div>
+</form>
+
+<hr>
+
+<h3>📋 現有合約</h3>
+<div class="responsive-table">
+    <table>
+        <thead>
+            <tr>
+                <th>附件</th>
+                <th>廠商名稱</th>
+                <th>合約主旨</th>
+                <th>結束日期</th>
+                <th>狀態</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in all_contracts %}
+            <tr>
+                <td style="text-align: center;">
+                    {% if c.attachment_filename %}
+                        <a href="{{ url_for('serve_contract_file', file_path=c.attachment_filename) }}" target="_blank" title="查看附件" style="font-size: 1.5em; text-decoration: none;">📎</a>
+                    {% endif %}
+                </td>
+                <td>{{ c.VendorName }}</td>
+                <td>{{ c.Subject }}</td>
+                <td>{{ c.EndDate.strftime('%Y-%m-%d') if c.EndDate else '' }}</td>
+                <td>{{ c.Status }}</td>
+                <td>
+                    <a href="{{ url_for('edit_contract_page', contract_id=c.ContractID) }}" style="text-decoration: none; font-size: 1.2em;" title="編輯">✏️</a>
+                    <form action="{{ url_for('delete_contract') }}" method="post" style="display:inline;" onsubmit="return confirm('您確定要刪除「{{ c.VendorName }}」這筆合約嗎？');">
+                        <input type="hidden" name="contract_id" value="{{ c.ContractID }}">
+                        <button type="submit" style="background:none; border:none; color:red; cursor:pointer; padding:0; font-size:1.2em;" title="刪除">🗑️</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

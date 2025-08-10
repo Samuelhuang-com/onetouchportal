@@ -3,22 +3,36 @@
 <div class="page-header">
   <h2>帳號管理</h2>
 </div>
-<table>
-  <thead>
-    <tr>
-      <th>帳號</th>
-      <th>名稱</th>
-      <th>角色</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for uid, info in users.items() %}
-    <tr>
-      <td>{{ uid }}</td>
-      <td>{{ info.name }}</td>
-      <td>{{ info.role }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+
+<div class="responsive-table">
+  <table>
+    <thead>
+      <tr>
+        <th>登入帳號</th>
+        <th>使用者名稱</th>
+        <th>角色</th>
+        <th>狀態</th>
+        <!-- You can add more headers from your Excel file if needed -->
+      </tr>
+    </thead>
+    <tbody>
+      {# ★★★ 錯誤修正：修改迴圈以遍歷 list ★★★ #} {% for user in users %}
+      <tr>
+        {# 根據 Excel 中的欄位名稱 (loginname, username, role, status)
+        來存取資料 #}
+        <td>{{ user.loginname }}</td>
+        <td>{{ user.username }}</td>
+        <td>{{ user.role }}</td>
+        <td>{{ user.status }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" style="text-align: center; padding: 20px">
+          找不到任何使用者資料，請檢查 'data/Permissioncontrol.xlsx' 檔案。
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}

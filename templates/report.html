@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}營業日誌 - {{ super() }}{% endblock %}
+{% block content %}
+<style>
+  .responsive-table {
+    overflow-x: auto;
+    width: 100%;
+    margin-top: 0rem;
+    border-collapse: collapse;
+  }
+  .responsive-table th,
+  .responsive-table td {
+    white-space: nowrap;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+  }
+  .form-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 0rem;
+  }
+  h2, h3 {
+    margin-top: 0;
+    margin-bottom: 0rem;
+  }
+</style>
+
+<form method="get" action="/report" class="form-inline" id="reportForm">
+  <label for="date">選擇日期：</label>
+  <select name="date" id="date"
+          onchange="document.getElementById('reportForm').submit();"
+          style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;">
+    {% for d in available_dates %}
+      <option value="{{ d }}" {% if d == report_date %}selected{% endif %}>{{ d }}</option>
+    {% endfor %}
+  </select>
+  <button type="button" class="button" onclick="selectToday()">📅 今天</button>
+  <button type="button" class="button" onclick="selectMonth()">📆 本月</button>
+</form>
+
+<script>
+  function selectToday() {
+    const today = new Date().toISOString().slice(0,10);
+    const dropdown = document.getElementById('date');
+    for (let opt of dropdown.options) {
+      if (opt.value === today) {
+        dropdown.value = today;
+        document.getElementById('reportForm').submit();
+        return;
+      }
+    }
+    alert("⚠️ 今日尚無報表資料");
+  }
+  function selectMonth() {
+    const dropdown = document.getElementById('date');
+    if (dropdown.options.length > 0) {
+      dropdown.selectedIndex = dropdown.options.length - 1;
+      document.getElementById('reportForm').submit();
+    }
+  }
+</script>
+
+{% if report_date %}
+<style>
+  .report-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 10px; /* 單元格之間的間距 */
+  }
+  .report-table td {
+    min-width: 250px;
+    background: #f9f9f9;
+    padding: 10px;
+    border-radius: 5px;
+    vertical-align: top;
+  }
+</style>
+
+<table class="report-table">
+  <tr>
+    <td style="border-left:5px solid #3c8dbc;">
+      <strong>📅 本月預算/天數<br>{{ budgets.mtd_revenue | number }}</strong>
+    </td>
+    <td style="border-left:5px solid #00a65a;">
+      <strong>📈 每日營收預算<br>{{ budgets.day_revenue | number }}</strong>
+    </td>
+    <td style="border-left:5px solid #f39c12;">
+      <strong>🍷 本月酒水預算<br>{{ budgets.mtd_bev | number }}</strong>
+    </td>
+    <td style="border-left:5px solid #605ca8;">
+      <strong>🥂 每日酒水預算<br>{{ budgets.day_bev | number }}</strong>
+    </td>
+  </tr>
+  <tr>
+    <td style="border-left:5px solid #0073b7;">
+      <strong>📊 目前累計收入<br>{{ mtd_revenue }}</strong>
+    </td>
+    <td style="border-left:5px solid #00c0ef;">
+      <strong>📈 本月達成率<br>{{ rates.mtd_rate | percent }}</strong>
+    </td>
+    <td style="border-left:5px solid #d81b60;">
+      <strong>📉 累計達成率<br>{{ rates.accumulated_mtd_rate | percent }}</strong>
+    </td>
+    <td style="border-left:5px solid #39cccc;">
+      <strong>🍹 酒水達成率<br>{{ rates.bev_rate | percent }}</strong>
+    </td>
+  </tr>
+</table>
+
+<hr>
+<h3>📅 報表日期：{{ report_date }}　📍{{ branch }}</h3>
+<div class="responsive-table">
+  <table>
+    <thead>
+      <tr>
+        <th>餐別</th><th>來客數</th><th>餐食收入</th>
+        <th>飲料收入</th><th>其他收入</th><th>服務費</th>
+        <th>總收入</th><th>平均消費</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in records %}
+      <tr>
+        <td>{{ r.Meal }} {{ r.Meal_Chinese }}</td>
+        <td align="right">{{ r.Covers }}</td>
+        <td align="right">{{ r.FoodRev }}</td>
+        <td align="right">{{ r.BevRev }}</td>
+        <td align="right">{{ r.OthersRev }}</td>
+        <td align="right">{{ r.SvcCharge }}</td>
+        <td align="right">{{ r.TotalFB }}</td>
+        <td align="right">{{ r.AvgCheck }}</td>
+      </tr>
+      {% endfor %}
+      <tr style="font-weight:bold;background:#f0f0f0;">
+        <td>Total 總計</td>
+        <td align="right">{{ totals.Covers }}</td>
+        <td align="right">{{ totals.FoodRev }}</td>
+        <td align="right">{{ totals.BevRev }}</td>
+        <td align="right">{{ totals.OthersRev }}</td>
+        <td align="right">{{ totals.SvcCharge }}</td>
+        <td align="right">{{ totals.TotalFB }}</td>
+        <td align="right">{{ totals.AvgCheck }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="margin-top:20px;">
+  <strong>MTD 月累計收入：</strong>{{ mtd_revenue }}　
+  <strong>本月達成率：</strong>{{ rates.mtd_rate | percent }}　
+  <strong>本月累計達成率：</strong>{{ rates.accumulated_mtd_rate | percent }}　
+  <strong>每日達成率：</strong>{{ rates.day_rate | percent }}　
+  <strong>酒水達成率：</strong>{{ rates.bev_rate | percent }}
+</div>
+
+{% if chart_data %}
+<canvas id="revenueChart" height="100"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('revenueChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: {{ chart_data.labels | tojson }},
+      datasets: [
+        { label: '每日總收入', data: {{ chart_data.total | tojson }}, tension:0.3 },
+        { label: '平均消費', data: {{ chart_data.avgcheck | tojson }}, borderDash:[5,5], yAxisID:'y1' }
+      ]
+    },
+    options:{
+      responsive:true,
+      scales:{
+        y:{ title:{display:true,text:'收入 (元)'} },
+        y1:{ position:'right', grid:{drawOnChartArea:false}, title:{display:true,text:'平均消費'} }
+      },
+      plugins:{ legend:{position:'bottom'} }
+    }
+  });
+</script>
+{% endif %}
+{% endif %}
+{% endblock %}

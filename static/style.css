@@ -41,9 +41,13 @@ a:hover {
 
 .page-content {
     flex-grow: 1;
-    padding: 24px;
+    padding: 12px 16px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px; /* 加入元件之間的間距控制 */
 }
+
 
 /* 頂部品牌區塊樣式 (靠左對齊) */
 .sidebar-brand {
@@ -94,7 +98,7 @@ a:hover {
 /* --- 側邊導覽列 Sidebar --- */
 .sidebar {
     width: 240px;
-    background-color: #343a40;
+    background-color: #343a40;;
     color: #f8f9fa;
     display: flex;
     flex-direction: column;
@@ -222,7 +226,7 @@ a:hover {
 
 .page-content {
     flex-grow: 1;
-    padding: 20px;
+    padding: 10px;
     overflow-y: auto; /* 讓內容區域可以滾動 */
 }
 
@@ -415,11 +419,74 @@ login-container {
 
 .page-content {
     flex-grow: 1;
-    padding: 24px;
+    padding: 10px;
     overflow-y: auto;
     display: flex; /* 讓內容區塊也成為 flex 容器 */
     flex-direction: column; /* 讓子元素垂直排列 */
 }
+
+.report-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;              /* 從 2rem → 1rem */
+  margin-bottom: 0.5rem;  /* 從 1rem → 0.5rem */
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: white;
+  padding: 1rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stats-row {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 10px;
+}
+.stats-item {
+  min-width: 200px; /* 每一項寬度一致 */
+  flex: 0 0 auto;
+}
+
+/* report header 容器 */
+/* --- report header & cards --- */
+.report-header {
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+.report-cards {
+  gap: 5px;
+}
+.report-card {
+  padding: 6px;
+}
+/* tighten up titles */
+.report-header h2,
+.report-header h3 {
+  margin-top: 0;
+  margin-bottom: 0.25rem;
+}
+
+/* --- filter form --- */
+.form-inline {
+  margin-bottom: 0.5rem;
+}
+
+/* --- table --- */
+.responsive-table {
+  margin-top: 0.5rem;
+}
+
+
 
 /* --- Power BI 容器樣式 --- */
 .powerbi-container {
@@ -600,8 +667,266 @@ tbody tr:hover {
 /* --- 調整 page-content 以配合 iframe --- */
 .page-content {
     flex-grow: 1;
-    padding: 24px;
+    padding: 10px;
     overflow-y: auto;
     display: flex; /* 讓內容區塊也成為 flex 容器 */
     flex-direction: column; /* 讓子元素垂直排列 */
+}
+
+/* --- 檔案列表樣式 (hrFolder.html) --- */
+.file-list ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.file-list li {
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 5px;
+    margin-bottom: 8px;
+    transition: box-shadow 0.2s;
+}
+
+.file-list li:hover {
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.file-list li a {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    text-decoration: none;
+    color: #343a40;
+    font-weight: 500;
+}
+
+.file-list li a:hover {
+    background-color: #f8f9fa;
+}
+
+.file-list li a .icon {
+    margin-right: 12px;
+    font-size: 1.2em;
+    color: #007bff;
+}
+
+/* --- 錯誤訊息提示框 --- */
+.alert.alert-danger {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    padding: 15px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+
+/* 狀態標示色彩列樣式 */
+
+.status-cancelled {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-restaurant-cancelled {
+  background-color: #e2e3e5;
+  color: #383d41;
+}
+
+.status-seated {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-reserved {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-notified {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-unseated {
+  background-color: #f0f0f0;
+  color: #343a40;
+}
+
+/* --- Sidebar Submenu Styles (視覺優化) --- */
+
+/* 讓主連結的內容可以平均分配空間 */
+.sidebar-links li a {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.sidebar-links li a .link-name {
+    flex-grow: 1; /* 讓文字佔據剩餘空間，將箭頭推到最右邊 */
+}
+
+/* 子選單容器的樣式 */
+.submenu {
+    list-style-type: none;
+    padding-left: 0;
+    overflow: hidden;
+    max-height: 0; /* 預設隱藏子選單 */
+    transition: max-height 0.3s ease-in-out; /* 平滑的展開/收合動畫 */
+    background-color: rgba(0, 0, 0, 0.2); /* 加深背景顏色，更明顯 */
+    position: relative; /* 為了定位垂直線 */
+}
+
+/* 新增：用偽元素製作左側的垂直參考線 */
+.submenu::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 28px; /* 對齊子選單的圖示或文字縮排 */
+    width: 1px; /* 線條細一點比較精緻 */
+    height: 100%;
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* 當父選單被展開時 (li.open) */
+.has-submenu.open > .submenu {
+    max-height: 500px; /* 一個足夠大的值，讓內容可以完全顯示 */
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+/* 子選單項目的連結 */
+.submenu a {
+    padding: 10px 20px 10px 48px !important; /* 調整 padding */
+    font-size: 0.9em;
+    color: #ced4da !important;
+    border-left: 4px solid transparent !important; /* 重設邊框 */
+    position: relative; /* 為了定位前面的小橫線 */
+}
+
+/* 新增：在每個子選單項目前面加上小橫線，連接到垂直線 */
+.submenu a::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 28px; /* 與垂直線對齊 */
+    transform: translateY(-50%);
+    width: 12px;
+    height: 1px; /* 線條細一點比較精緻 */
+    background-color: rgba(224, 16, 131, 0.3);
+    transition: all 0.3s;
+}
+
+.submenu a:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* 子選單項目高亮時的樣式 */
+.submenu a.active {
+    background-color: #007bff !important;
+    color: #ffffff !important;
+    font-weight: 500;
+}
+
+/* 當子選單項目高亮或 hover 時，也讓小橫線變亮 */
+.submenu a.active::before,
+.submenu a:hover::before {
+    background-color: #ffffff;
+}
+
+/* 下拉箭頭的樣式 */
+.arrow {
+    margin-left: auto; /* 自動推到最右邊 */
+    width: 0;
+    height: 0;
+    border-left: 5px solid currentColor;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    transition: transform 0.3s;
+}
+
+/* 當選單展開時，旋轉箭頭 */
+.has-submenu.open > a > .arrow {
+    transform: rotate(90deg);
+}
+
+/* --- Sidebar Collapse Styles (新增) --- */
+
+/* 預設狀態的側邊欄 */
+.sidebar {
+    width: 180px;
+    transition: width 0.3s ease-in-out; /* 寬度變化動畫 */
+}
+
+/* 當 .app-container 加上 .sidebar-collapsed class 時的樣式 */
+.app-container.sidebar-collapsed .sidebar {
+    width: 80px; /* 收合後的寬度 */
+}
+
+.app-container.sidebar-collapsed .sidebar .link-name,
+.app-container.sidebar-collapsed .sidebar .arrow {
+    display: none; /* 隱藏所有文字和箭頭 */
+}
+
+/* 讓 Logo 和品牌文字垂直置中 */
+.sidebar-brand {
+    display: flex;
+    flex-direction: column; /* 改為垂直排列 */
+    justify-content: center; /* 垂直置中 */
+    align-items: center;     /* 水平置中 */
+    padding:  0;         /* 調整上下 padding */
+    height: 90px;            /* 增加高度以容納兩行 */
+    box-sizing: border-box;
+    text-align: center;      /* 文字置中 */
+}
+
+.sidebar-brand .logo {
+    height: 32px;
+    margin-right: 0; /* 移除右邊距 */
+    margin-bottom: 2px; /* 增加 Logo 和文字之間的間距 */
+}
+
+/* 收合時，讓 Logo 置中 */
+.app-container.sidebar-collapsed .sidebar-brand {
+    justify-content: center;
+}
+.app-container.sidebar-collapsed .sidebar .logo {
+    margin-right: 0;
+    margin-bottom: 0; /* 收合時不需要底部間距 */
+}
+
+/* 收合時，子選單的處理 */
+.app-container.sidebar-collapsed .has-submenu.open > .submenu {
+    max-height: 0; /* 強制關閉已打開的子選單 */
+}
+
+/* 收合時，子選單的垂直線和水平線都隱藏 */
+.app-container.sidebar-collapsed .submenu::before,
+.app-container.sidebar-collapsed .submenu a::before {
+    display: none;
+}
+
+/* 收合時，讓圖示置中 */
+.app-container.sidebar-collapsed .sidebar-links li a,
+.app-container.sidebar-collapsed .sidebar-footer a {
+    justify-content: center;
+}
+
+.app-container.sidebar-collapsed .sidebar-links li a .icon,
+.app-container.sidebar-collapsed .sidebar-footer a .icon {
+    margin-right: 0;
+}
+
+/* 收合按鈕的圖示，可以自行替換成 SVG 圖示會更美觀 */
+#sidebar-toggle .toggle-icon {
+    transition: transform 0.3s;
+}
+
+.app-container.sidebar-collapsed #sidebar-toggle .toggle-icon {
+    transform: rotate(180deg); /* 旋轉圖示 */
+}
+
+/* 主內容區塊的過渡動畫 */
+.main-content {
+    transition: margin-left 0.3s ease-in-out;
 }
