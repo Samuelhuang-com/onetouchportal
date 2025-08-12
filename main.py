@@ -18,6 +18,7 @@ import json
 
 # 從 app_utils 匯入共用的函式和物件
 from app_utils import get_base_context, templates, PERMISSION_FILE, ANNOUNCEMENTS_FILE
+
 # ★ 核心修正：匯入新的儀表板工具函式
 from dashboard_utils import get_dashboard_kpis
 
@@ -30,6 +31,8 @@ from reservations_router import router as reservations_router
 from announcement_router import router as announcement_router
 from budget_router import router as budget_router
 from user_router import router as user_router
+from laundry_request_router import router as laundry_router
+from laundry_report_router import router as laundry_report_router
 
 # --- App 初始化 ---
 app = FastAPI(title="飯店管理系統")
@@ -44,6 +47,9 @@ app.include_router(reservations_router)
 app.include_router(announcement_router)
 app.include_router(budget_router)
 app.include_router(user_router)
+app.include_router(laundry_router)
+app.include_router(laundry_report_router)
+
 
 # --- 權限檢查相依性 (可重複使用) ---
 def check_permission(permission_key: str):
@@ -69,12 +75,13 @@ def check_permission(permission_key: str):
 
     return _checker
 
+
 @app.get("/", response_class=HTMLResponse)
 async def home_page(
     request: Request,
     user: Optional[str] = Cookie(None),
     role: Optional[str] = Cookie(None),
-    permissions: Optional[str] = Cookie(None)
+    permissions: Optional[str] = Cookie(None),
 ):
     # 如果你要登入後才看得到，可以加判斷
     if not user:
@@ -86,6 +93,7 @@ async def home_page(
 
 # --- 核心路由 (已修正權限傳遞與保護) ---
 # --- 請將此段程式碼加入到您的 main.py 中 ---
+
 
 @app.get("/home", response_class=HTMLResponse)
 async def home_page(
@@ -99,12 +107,13 @@ async def home_page(
     """
     if not user:
         return RedirectResponse(url="/login")
-    
+
     # 取得共用的 context
     ctx = get_base_context(request, user, role, permissions)
-    
+
     # 渲染 home.html 頁面
     return templates.TemplateResponse("home.html", ctx)
+
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(
@@ -115,29 +124,35 @@ async def dashboard(
 ):
     if not user:
         return RedirectResponse(url="/")
-    
+
     ctx = get_base_context(request, user, role, permissions)
 
     # --- ★ 核心修正：重新加入完整的數據獲取邏輯 ---
     # 1. 讀取公告
     latest_announcements = []
-    can_view_announcements = (role == 'admin') or ctx['permissions'].get('view_announcements', False)
+    can_view_announcements = (role == "admin") or ctx["permissions"].get(
+        "view_announcements", False
+    )
     if can_view_announcements:
         try:
             if os.path.exists(ANNOUNCEMENTS_FILE):
                 with open(ANNOUNCEMENTS_FILE, "r", encoding="utf-8") as f:
                     all_announcements = json.load(f)
-                latest_announcements = sorted(all_announcements, key=lambda x: x.get('timestamp', ''), reverse=True)[:5]
+                latest_announcements = sorted(
+                    all_announcements,
+                    key=lambda x: x.get("timestamp", ""),
+                    reverse=True,
+                )[:5]
         except (FileNotFoundError, json.JSONDecodeError):
             latest_announcements = []
-    
+
     # 2. 從 dashboard_utils 模組獲取儀表板 KPI
     dashboard_kpis = get_dashboard_kpis()
 
     # 3. 將所有數據加入到 context 中，確保 'kpis' 被傳遞
     ctx["announcements"] = latest_announcements
     ctx["kpis"] = dashboard_kpis
-    
+
     return templates.TemplateResponse("dashboard.html", ctx)
 
 
@@ -161,13 +176,14 @@ async def employees_page(
     except FileNotFoundError:
         # 如果檔案不存在，records 會是一個空列表，頁面會正常顯示「無資料」
         pass
-    
+
     # 準備 context 並只傳入員工頁面需要的資料
     ctx = get_base_context(request, user, role, permissions)
     ctx["records"] = records
-    
+
     # 確保渲染正確的 employees.html 樣板
     return templates.TemplateResponse("employees.html", ctx)
+
 
 @app.get("/powerbi", response_class=HTMLResponse)
 async def powerbi_page(
@@ -284,4 +300,3 @@ async def events_page(
     ctx = get_base_context(request, user, role, permissions)
     ctx["events"] = events
     return templates.TemplateResponse("events.html", ctx)
-

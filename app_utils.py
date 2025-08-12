@@ -54,6 +54,7 @@ NAV_ITEMS = [
         "icon": "📖",
         "permission_key": "reservations",
     },
+    # ==========================
     {
         "name": "營運報表",
         "icon": "📊",
@@ -120,7 +121,16 @@ NAV_ITEMS = [
             },
         ],
     },
-     {"name": "功能總覽", "url": "/home", "icon": "🧭"},
+    # ===== 新增洗衣管理子選單 =====
+    {
+        "name": "洗衣管理",
+        "icon": "👕",
+        "sub_items": [
+            {"name": "洗衣房登記", "url": "/laundry/request"},
+            {"name": "洗衣統計報表", "url": "/laundry/report"},
+        ],
+    },
+    {"name": "功能總覽", "url": "/home", "icon": "🧭"},
 ]
 
 
@@ -142,6 +152,7 @@ def get_visible_nav_items(role: str, permissions: Dict[str, bool]) -> List[Dict]
                 visible_items.append(new_item)
         else:
             key = item.get("permission_key")
+            # 如果沒有權限鍵，則所有登入用戶都可見
             if not key or role == "admin" or permissions.get(key, False):
                 visible_items.append(item)
     return visible_items

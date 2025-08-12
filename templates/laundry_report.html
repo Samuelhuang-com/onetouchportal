@@ -1,0 +1,145 @@
+<!-- templates/laundry_report.html -->
+{% extends "base.html" %} {% block title %}洗衣統計報表 - {{ super() }}{%
+endblock %} {% block content %}
+<div class="page-header">
+  <h2>洗衣統計報表</h2>
+</div>
+
+<div class="card">
+  <form action="/laundry/report" method="get" class="filter-form">
+    <div class="form-group">
+      <label for="start_date">開始日期</label>
+      <input
+        type="date"
+        id="start_date"
+        name="start_date"
+        value="{{ start_date or '' }}"
+        required
+      />
+    </div>
+    <div class="form-group">
+      <label for="end_date">結束日期</label>
+      <input
+        type="date"
+        id="end_date"
+        name="end_date"
+        value="{{ end_date or '' }}"
+        required
+      />
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="button button-primary">查詢</button>
+    </div>
+  </form>
+</div>
+
+{% if error %}
+<div class="alert alert-danger" style="margin-top: 20px">
+  <strong>錯誤：</strong> {{ error }}
+</div>
+{% endif %} {% if start_date and end_date and not error %}
+<div class="card" style="margin-top: 20px">
+  <div class="page-header">
+    <h3>查詢結果</h3>
+    <small>日期區間：{{ start_date }} 至 {{ end_date }}</small>
+  </div>
+
+  {% if results %}
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>部門</th>
+          <!-- 動態生成所有衣物項目的欄位標頭 -->
+          {% for item in clothing_items %}
+          <th class="text-center">{{ item }}</th>
+          {% endfor %}
+          <th class="text-center">部門總計</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- 顯示每個部門的詳細數據 -->
+        {% for row in results %}
+        <tr>
+          <td>{{ row.部門 }}</td>
+          {% for item in clothing_items %}
+          <td class="text-center">{{ row[item] }}</td>
+          {% endfor %}
+          <td class="text-center"><strong>{{ row.部門總計 }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td><strong>總計</strong></td>
+          <!-- 顯示所有部門的各項加總 -->
+          {% for item in clothing_items %}
+          <td class="text-center"><strong>{{ grand_totals[item] }}</strong></td>
+          {% endfor %}
+          <td class="text-center">
+            <strong>{{ grand_totals.部門總計 }}</strong>
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+  {% else %}
+  <p style="text-align: center; padding: 20px">
+    此日期區間內沒有找到任何送洗紀錄。
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
+<style>
+  .filter-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 20px;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+  .form-group label {
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+  .form-group input[type="date"] {
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-size: 1rem;
+  }
+  .form-actions {
+    margin-bottom: 0;
+  }
+  .card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  /* 讓表格可以水平滾動 */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    min-width: 1200px; /* 給定一個最小寬度，確保在小螢幕上不會擠壓 */
+  }
+  table th,
+  table td {
+    white-space: nowrap; /* 防止欄位文字換行 */
+  }
+  table tfoot {
+    border-top: 2px solid #333;
+    font-size: 1.1rem;
+  }
+  .text-center {
+    text-align: center;
+  }
+</style>
+{% endblock %}

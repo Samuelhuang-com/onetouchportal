@@ -1,0 +1,642 @@
+{% extends "base.html" %} {% block title %}首頁 - {{ super() }}{% endblock %} {%
+block content %}
+<style>
+  :root {
+    --bg: #f7f8fa;
+    --card-bg: #ffffff;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --primary-weak: #e6efff;
+    --ring: rgba(37, 99, 235, 0.25);
+    --shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+    --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --card-bg: #d2d6e9ff;
+      --text: #e5e7eb;
+      --muted: #9aa1ad;
+      --primary: #60a5fa;
+      --primary-weak: #102036;
+      --ring: rgba(96, 165, 250, 0.3);
+      --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+  .home-wrap {
+    padding: 12px 12px 28px;
+  }
+  .hero {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin: 4px 0 14px;
+  }
+  .hero .logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    background: var(--primary-weak);
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+  }
+  .hero .h-title {
+    font-weight: 700;
+    color: #3498db;
+    font-size: clamp(18px, 2.2vw, 22px);
+  }
+  .hero .h-sub {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 4px 0 12px;
+  }
+  .chip {
+    border: 1px solid transparent;
+    background: var(--card-bg);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .chip[aria-pressed="true"] {
+    border-color: var(--primary);
+    outline: 3px solid var(--ring);
+  }
+  .search {
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    background: var(--card-bg);
+    padding: 8px 12px;
+    border-radius: 999px;
+    box-shadow: var(--shadow);
+  }
+  .search input {
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    width: 180px;
+    font-size: 14px;
+  }
+  .grid {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+  }
+  @media (min-width: 640px) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1024px) {
+    .grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 18px 4px 10px;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    font-size: 12px;
+    text-transform: uppercase;
+  }
+  .section-title .badge {
+    font-size: 18px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    padding: 14px;
+    box-shadow: var(--shadow);
+    border: 1px solid transparent;
+    transition: transform 0.15s ease, box-shadow 0.15s ease,
+      border-color 0.15s ease;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    position: relative;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+    border-color: var(--primary-weak);
+  }
+  .card .ico {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: var(--primary-weak);
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+    flex: 0 0 auto;
+  }
+  .card .title {
+    font-weight: 700;
+    color: var(--text);
+    font-size: 15px;
+    margin: 0;
+  }
+  .card .desc {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 4px 0 10px;
+    line-height: 1.5;
+  }
+  .card .tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    font-size: 11px;
+    background: var(--bg);
+    padding: 4px 8px;
+    border-radius: 999px;
+    color: var(--muted);
+  }
+  .card a.button {
+    margin-left: auto;
+    align-self: center;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+    background: var(--primary);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 10px;
+  }
+  .muted {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  /* 小徽角（分類） */
+  .pill {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: var(--bg);
+    color: var(--muted);
+    border: 1px solid var(--primary-weak);
+  }
+</style>
+
+<div class="home-wrap">
+  <div class="hero" role="region" aria-label="歡迎區塊">
+    <div class="logo">✨</div>
+    <div>
+      <div class="h-title">OneTouch Portal — 一鍵直達工作重點</div>
+      <div class="h-sub">
+        快速找到 KPI、申請流程、培訓、公告與安全回報。今天也順順利利 ✨
+      </div>
+    </div>
+  </div>
+
+  <!-- 篩選列 -->
+  <div class="filterbar" role="toolbar" aria-label="功能篩選">
+    <button class="chip" data-filter="all" aria-pressed="true">全部</button>
+    <button class="chip" data-filter="ops">營運&決策</button>
+    <button class="chip" data-filter="hr">人資&員服</button>
+    <button class="chip" data-filter="collab">溝通&協作</button>
+    <button class="chip" data-filter="proc">流程優化</button>
+    <button class="chip" data-filter="culture">資訊&文化</button>
+    <button class="chip" data-filter="safe">安全&合規</button>
+    <div class="search" role="search">
+      <span>🔎</span>
+      <input
+        id="searchBox"
+        type="search"
+        placeholder="搜尋功能或說明…"
+        aria-label="搜尋"
+      />
+    </div>
+  </div>
+
+  <!-- ㊙ 提示：每個卡片用 data-cat 指定分類，可被篩選 -->
+  <div class="section-title"><span class="badge">📊</span> 營運與決策支援</div>
+  <div class="grid">
+    <div
+      class="card"
+      data-cat="ops"
+      data-keywords="kpi dashboard revenue adr revpar 餐飲 依部門 分店 即時"
+    >
+      <div class="ico">📈</div>
+      <div>
+        <p class="title">即時 KPI 儀表板</p>
+        <p class="desc">
+          總營收、入住率、ADR、RevPAR、餐飲收入自動更新，支援部門/分店篩選。
+        </p>
+        <div class="tags">
+          <span class="tag">Dashboard</span
+          ><span class="tag">Auto-Refresh</span>
+        </div>
+      </div>
+      <span class="pill">營運</span>
+      <a class="button" href="/dashboard">進入</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="ops"
+      data-keywords="ai 預測 訂房 需求 人力配置 淡旺季 餐飲 銷售 趨勢"
+    >
+      <div class="ico">🤖</div>
+      <div>
+        <p class="title">AI 預測分析</p>
+        <p class="desc">
+          訂房需求預測、淡旺季人力配置、餐飲銷售趨勢，提前布署營收與人力。
+        </p>
+        <div class="tags">
+          <span class="tag">Forecast</span><span class="tag">ML</span>
+        </div>
+      </div>
+      <span class="pill">營運</span>
+      <a class="button" href="/ai/forecast">進入</a>
+    </div>
+  </div>
+
+  <div class="section-title">
+    <span class="badge">👥</span> 人力資源與員工服務
+  </div>
+  <div class="grid">
+    <div
+      class="card"
+      data-cat="hr"
+      data-keywords="差勤 假單 出缺勤 加班 請假 主管審批 假別餘額"
+    >
+      <div class="ico">🗓️</div>
+      <div>
+        <p class="title">線上差勤與假單</p>
+        <p class="desc">請假/加班線上申請與審批，自動記錄出缺勤與假別餘額。</p>
+        <div class="tags">
+          <span class="tag">e-Form</span><span class="tag">Workflow</span>
+        </div>
+      </div>
+      <span class="pill">人資</span>
+      <a class="button" href="/hr/leave">前往</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="hr"
+      data-keywords="薪資 勞健保 獎金 福利 查詢 申請 透明"
+    >
+      <div class="ico">💵</div>
+      <div>
+        <p class="title">薪資查詢與福利</p>
+        <p class="desc">薪資明細、獎金、勞健保與福利額度查詢，福利一鍵申請。</p>
+        <div class="tags">
+          <span class="tag">Payroll</span><span class="tag">Benefits</span>
+        </div>
+      </div>
+      <span class="pill">人資</span>
+      <a class="button" href="/hr/payroll">前往</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="hr"
+      data-keywords="績效 評核 自評 主管回饋 IDP 發展計畫 追蹤"
+    >
+      <div class="ico">📊</div>
+      <div>
+        <p class="title">績效評核與發展</p>
+        <p class="desc">年度/季度績效流程與個人發展計畫（IDP）追蹤。</p>
+        <div class="tags">
+          <span class="tag">Performance</span><span class="tag">IDP</span>
+        </div>
+      </div>
+      <span class="pill">人資</span>
+      <a class="button" href="/hr/performance">前往</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="hr"
+      data-keywords="培訓 e-learning 新人到職 影片 教材 測驗"
+    >
+      <div class="ico">🎓</div>
+      <div>
+        <p class="title">線上培訓平台</p>
+        <p class="desc">新人到職課程、影片教材與測驗，完整紀錄學習歷程。</p>
+        <div class="tags">
+          <span class="tag">LMS</span><span class="tag">Onboarding</span>
+        </div>
+      </div>
+      <span class="pill">人資</span>
+      <a class="button" href="/lms">前往</a>
+    </div>
+  </div>
+
+  <div class="section-title"><span class="badge">🗨</span> 溝通與協作</div>
+  <div class="grid">
+    <div
+      class="card"
+      data-cat="collab"
+      data-keywords="論壇 知識庫 Q&A SOP 維基 搜尋 標籤"
+    >
+      <div class="ico">📚</div>
+      <div>
+        <p class="title">內部論壇 / 知識庫</p>
+        <p class="desc">
+          像 StackOverflow × Wiki 的知識沉澱中心，最佳解答置頂。
+        </p>
+        <div class="tags">
+          <span class="tag">Q&A</span><span class="tag">Wiki</span>
+        </div>
+      </div>
+      <span class="pill">協作</span>
+      <a class="button" href="/kb">進入</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="collab"
+      data-keywords="專案 任務 看板 進度 指派 截止日"
+    >
+      <div class="ico">🗂️</div>
+      <div>
+        <p class="title">專案 / 任務追蹤</p>
+        <p class="desc">Kanban 看板、任務指派與進度視覺化，跨部門更清晰。</p>
+        <div class="tags">
+          <span class="tag">Kanban</span><span class="tag">Projects</span>
+        </div>
+      </div>
+      <span class="pill">協作</span>
+      <a class="button" href="/projects">進入</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="collab"
+      data-keywords="會議室 公司車 投影機 預約 行事曆"
+    >
+      <div class="ico">📅</div>
+      <div>
+        <p class="title">資源預約系統</p>
+        <p class="desc">會議室、公司車、投影機統一預約與衝突避免。</p>
+        <div class="tags">
+          <span class="tag">Booking</span><span class="tag">Calendar</span>
+        </div>
+      </div>
+      <span class="pill">協作</span>
+      <a class="button" href="/booking">進入</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="collab"
+      data-keywords="表揚 月度之星 團隊 目標 達成 公告"
+    >
+      <div class="ico">🏆</div>
+      <div>
+        <p class="title">員工獎勵與表揚牆</p>
+        <p class="desc">月度之星＆團隊達標即時公告，營造正向文化。</p>
+        <div class="tags"><span class="tag">Recognition</span></div>
+      </div>
+      <span class="pill">協作</span>
+      <a class="button" href="/recognition">前往</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="collab"
+      data-keywords="意見 回饋 提案 改善 創新 匿名 獎勵"
+    >
+      <div class="ico">💡</div>
+      <div>
+        <p class="title">意見回饋與提案</p>
+        <p class="desc">記名/匿名都可，從基層蒐集改善與創新點子。</p>
+        <div class="tags">
+          <span class="tag">Suggestion</span><span class="tag">Rewards</span>
+        </div>
+      </div>
+      <span class="pill">協作</span>
+      <a class="button" href="/suggestions">提交</a>
+    </div>
+  </div>
+
+  <div class="section-title"><span class="badge">🛠</span> 營運與流程優化</div>
+  <div class="grid">
+    <div
+      class="card"
+      data-cat="proc"
+      data-keywords="費用 報銷 發票 收據 簽核 撥款"
+    >
+      <div class="ico">🧾</div>
+      <div>
+        <p class="title">費用報銷系統</p>
+        <p class="desc">無紙化報銷與自動簽核，加快撥款與對帳。</p>
+        <div class="tags">
+          <span class="tag">Expense</span><span class="tag">Workflow</span>
+        </div>
+      </div>
+      <span class="pill">流程</span>
+      <a class="button" href="/expense">申請</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="proc"
+      data-keywords="CRM 常客 偏好 過敏 紀念日 訂位 記錄 個人化"
+    >
+      <div class="ico">🤝</div>
+      <div>
+        <p class="title">簡易 CRM</p>
+        <p class="desc">常客偏好與歷史紀錄，一鍵提供個人化服務。</p>
+        <div class="tags">
+          <span class="tag">CRM</span><span class="tag">Guest</span>
+        </div>
+      </div>
+      <span class="pill">流程</span>
+      <a class="button" href="/crm">前往</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="proc"
+      data-keywords="IT 支援 服務台 工單 Ticket 網路 電腦 系統"
+    >
+      <div class="ico">🛟</div>
+      <div>
+        <p class="title">IT 支援服務台</p>
+        <p class="desc">工單集中與處理時效追蹤，常見問題歸納。</p>
+        <div class="tags">
+          <span class="tag">Helpdesk</span><span class="tag">SLA</span>
+        </div>
+      </div>
+      <span class="pill">流程</span>
+      <a class="button" href="/it/helpdesk">報修</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="proc"
+      data-keywords="資源 申請 審核 設備 借用 維修 制服 物資"
+    >
+      <div class="ico">📦</div>
+      <div>
+        <p class="title">資源申請與審核</p>
+        <p class="desc">設備借用/維修、制服與物資領用一站式處理。</p>
+        <div class="tags"><span class="tag">Request</span></div>
+      </div>
+      <span class="pill">流程</span>
+      <a class="button" href="/requests">申請</a>
+    </div>
+  </div>
+
+  <div class="section-title"><span class="badge">📰</span> 資訊與文化</div>
+  <div class="grid">
+    <div
+      class="card"
+      data-cat="culture"
+      data-keywords="每日 營運 快訊 摘要 今日 事件 主管 留言"
+    >
+      <div class="ico">🗞️</div>
+      <div>
+        <p class="title">每日營運快訊</p>
+        <p class="desc">前日營運摘要、今日重點與主管留言，一頁掌握。</p>
+        <div class="tags"><span class="tag">Daily</span></div>
+      </div>
+      <span class="pill">文化</span>
+      <a class="button" href="/daily-brief">查看</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="culture"
+      data-keywords="電子報 每週 公司新聞 培訓 行業 趨勢"
+    >
+      <div class="ico">✉️</div>
+      <div>
+        <p class="title">內部電子報</p>
+        <p class="desc">每週推送公司新聞、培訓資訊與行業趨勢。</p>
+        <div class="tags"><span class="tag">Newsletter</span></div>
+      </div>
+      <span class="pill">文化</span>
+      <a class="button" href="/newsletter">訂閱</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="culture"
+      data-keywords="活動 員工 福利 旅遊 社團 聚餐 報名"
+    >
+      <div class="ico">🎉</div>
+      <div>
+        <p class="title">活動與福利專區</p>
+        <p class="desc">員旅、運動社團、聚餐活動報名，凝聚向心力。</p>
+        <div class="tags"><span class="tag">Events</span></div>
+      </div>
+      <span class="pill">文化</span>
+      <a class="button" href="/events">報名</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="culture"
+      data-keywords="新進 員工 介紹 榮譽 表揚 團隊"
+    >
+      <div class="ico">👋</div>
+      <div>
+        <p class="title">新進員工 / 榮譽榜</p>
+        <p class="desc">新同事 spotlight 與優秀團隊表揚牆。</p>
+        <div class="tags"><span class="tag">People</span></div>
+      </div>
+      <span class="pill">文化</span>
+      <a class="button" href="/people">查看</a>
+    </div>
+  </div>
+
+  <div class="section-title"><span class="badge">🔐</span> 安全與合規</div>
+  <div class="grid">
+    <div
+      class="card"
+      data-cat="safe"
+      data-keywords="安全 通報 緊急 火災 事故 設備 故障 回報"
+    >
+      <div class="ico">🚨</div>
+      <div>
+        <p class="title">安全通報系統</p>
+        <p class="desc">火災/意外/設備故障一鍵回報，自動通知應變窗口。</p>
+        <div class="tags"><span class="tag">Emergency</span></div>
+      </div>
+      <span class="pill">合規</span>
+      <a class="button" href="/safety/report">通報</a>
+    </div>
+
+    <div
+      class="card"
+      data-cat="safe"
+      data-keywords="合規 法令 個資法 防疫 安全 規範 公告"
+    >
+      <div class="ico">📜</div>
+      <div>
+        <p class="title">合規與法令更新</p>
+        <p class="desc">個資法、防疫、安全規範集中公告與版本控管。</p>
+        <div class="tags"><span class="tag">Compliance</span></div>
+      </div>
+      <span class="pill">合規</span>
+      <a class="button" href="/compliance">查看</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const chips = Array.from(document.querySelectorAll(".chip"));
+    const cards = Array.from(document.querySelectorAll(".card"));
+    const search = document.getElementById("searchBox");
+
+    function applyFilter() {
+      const active =
+        chips.find((c) => c.getAttribute("aria-pressed") === "true")?.dataset
+          .filter || "all";
+      const q = (search.value || "").trim().toLowerCase();
+      cards.forEach((card) => {
+        const matchCat = active === "all" || card.dataset.cat === active;
+        const hay = (
+          card.innerText +
+          " " +
+          (card.dataset.keywords || "")
+        ).toLowerCase();
+        const matchText = !q || hay.includes(q);
+        card.style.display = matchCat && matchText ? "flex" : "none";
+      });
+    }
+
+    chips.forEach((ch) => {
+      ch.addEventListener("click", () => {
+        chips.forEach((x) => x.setAttribute("aria-pressed", "false"));
+        ch.setAttribute("aria-pressed", "true");
+        applyFilter();
+      });
+    });
+    search.addEventListener("input", applyFilter);
+  })();
+</script>
+{% endblock %}
