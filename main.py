@@ -34,6 +34,7 @@ from user_router import router as user_router
 from laundry_request_router import router as laundry_router
 from laundry_report_router import router as laundry_report_router
 
+
 # --- App 初始化 ---
 app = FastAPI(title="飯店管理系統")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -49,7 +50,6 @@ app.include_router(budget_router)
 app.include_router(user_router)
 app.include_router(laundry_router)
 app.include_router(laundry_report_router)
-
 
 # --- 權限檢查相依性 (可重複使用) ---
 def check_permission(permission_key: str):

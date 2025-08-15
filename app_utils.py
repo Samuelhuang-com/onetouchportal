@@ -130,6 +130,7 @@ NAV_ITEMS = [
             {"name": "洗衣統計報表", "url": "/laundry/report"},
         ],
     },
+    {"name": "Excel 分析（MSR02）", "url": "analysis", "permission_key": "report"},
     {"name": "功能總覽", "url": "/home", "icon": "🧭"},
 ]
 
