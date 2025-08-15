@@ -1,212 +1,251 @@
-{% extends "base.html" %} {% block title %}營收與入住率波動分析 - {{ super()
+{% extends "base.html" %} {% block title %}Excel 分析統計（MSR02） - {{ super()
 }}{% endblock %} {% block content %}
-<link rel="preconnect" href="https://cdn.jsdelivr.net" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<style>
-  .grid {
-    display: grid;
-    grid-template-columns: 1.4fr 0.6fr;
-    gap: 1rem;
-  }
-  .card {
-    background: #fff;
-    border-radius: 12px;
-    padding: 1rem 1.2rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  }
-  .muted {
-    color: #6c757d;
-    font-size: 0.9rem;
-  }
-  .kpi-table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  .kpi-table th,
-  .kpi-table td {
-    border-bottom: 1px solid #eee;
-    padding: 0.5rem 0.4rem;
-    text-align: right;
-  }
-  .kpi-table th:first-child,
-  .kpi-table td:first-child {
-    text-align: left;
-  }
-  .tag {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    border-radius: 999px;
-    background: #f1f3f5;
-    margin-right: 0.4rem;
-    font-size: 0.85rem;
-  }
-  .bad {
-    background: #ffe3e3;
-  }
-  .good {
-    background: #e6fcf5;
-  }
-  .hint {
-    font-size: 0.9rem;
-    line-height: 1.6;
-  }
-  .title-row {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-  }
-</style>
-
-<div class="title-row">
-  <h2>📈 營收與入住率波動分析</h2>
-  {% if src_file %}<span class="tag">來源：{{ src_file }}</span>{% endif %} {%
-  if date_from and date_to %}<span class="tag"
-    >期間：{{ date_from }} ~ {{ date_to }}</span
-  >{% endif %}
+<div class="page-header">
+  <h2>Excel 分析統計（MSR02）</h2>
+  <div class="filters">
+    <label>開始日期 <input type="date" id="startDate" /></label>
+    <label>結束日期 <input type="date" id="endDate" /></label>
+    <button id="applyBtn" class="button">套用</button>
+  </div>
 </div>
 
 {% if error %}
-<div class="card"><p style="color: #c92a2a">⚠️ {{ error }}</p></div>
-{% else %}
-<div class="grid">
-  <div class="card">
-    <h3>每日指標趨勢</h3>
-    <canvas id="trendChart" height="140"></canvas>
-    <p class="muted">
-      顏色：營收 / 入住率 / ADR / RevPAR（同軸：收入類；入住率另軸，單位%）。
-    </p>
-  </div>
+<div class="alert alert-error">⚠️ {{ error }}</div>
+{% endif %}
 
-  <div class="card">
-    <h3>整體營運摘要</h3>
-    <table class="kpi-table">
-      <thead>
-        <tr>
-          <th>指標</th>
-          <th>平均值</th>
-          <th>最高</th>
-          <th>最低</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>總營收 (NT$)</td>
-          <td>{{ summary.revenue.avg | round(0) | int | number }}</td>
-          <td>{{ summary.revenue.max | round(0) | int | number }}</td>
-          <td>{{ summary.revenue.min | round(0) | int | number }}</td>
-        </tr>
-        <tr>
-          <td>入住率 (%)</td>
-          <td>{{ summary.occ.avg | round(2) }}</td>
-          <td>{{ summary.occ.max | round(2) }}</td>
-          <td>{{ summary.occ.min | round(2) }}</td>
-        </tr>
-        <tr>
-          <td>ADR (NT$)</td>
-          <td>{{ summary.adr.avg | round(0) | int | number }}</td>
-          <td>{{ summary.adr.max | round(0) | int | number }}</td>
-          <td>{{ summary.adr.min | round(0) | int | number }}</td>
-        </tr>
-        <tr>
-          <td>RevPAR (NT$)</td>
-          <td>{{ summary.revpar.avg | round(0) | int | number }}</td>
-          <td>{{ summary.revpar.max | round(0) | int | number }}</td>
-          <td>{{ summary.revpar.min | round(0) | int | number }}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="muted" style="margin-top: 0.6rem">
-      變異(Std)：營收 {{ summary.revenue.std | round(0) | int | number }}、
-      入住率 {{ summary.occ.std | round(2) }}、 ADR {{ summary.adr.std |
-      round(0) | int | number }}、 RevPAR {{ summary.revpar.std | round(0) | int
-      | number }}
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-title">期間</div>
+    <div class="kpi-value">
+      <span id="kPeriod"
+        >{{ kpi.period_start if kpi else '' }} ~ {{ kpi.period_end if kpi else
+        '' }}</span
+      >
     </div>
   </div>
-</div>
-
-<div class="card" style="margin-top: 1rem">
-  <h3>分析與洞察</h3>
-  <div class="hint">
-    {% if insight.start_date %}
-    <p>
-      📌 有效營運起跑日：約從
-      <strong>{{ insight.start_date }}</strong> 開始四大指標明顯轉正。
-    </p>
-    {% endif %}
-    <p>
-      📈 營收尖峰：{% if insight.peaks_dips.revenue.peaks %}{% for d in
-      insight.peaks_dips.revenue.peaks %}<span class="tag good">{{ d }}</span>{%
-      endfor %}{% else %}—{% endif %}
-    </p>
-    <p>
-      📉 營收低谷：{% if insight.peaks_dips.revenue.dips %}{% for d in
-      insight.peaks_dips.revenue.dips %}<span class="tag bad">{{ d }}</span>{%
-      endfor %}{% else %}—{% endif %}
-    </p>
-    <p>
-      🏨 入住率高點：{% if insight.peaks_dips.occ.peaks %}{% for d in
-      insight.peaks_dips.occ.peaks %}<span class="tag good">{{ d }}</span>{%
-      endfor %}{% else %}—{% endif %}
-    </p>
-    <p>
-      🕳️ 入住率低點：{% if insight.peaks_dips.occ.dips %}{% for d in
-      insight.peaks_dips.occ.dips %}<span class="tag bad">{{ d }}</span>{%
-      endfor %}{% else %}—{% endif %}
-    </p>
-    <hr />
-    <ul>
-      <li>
-        平日 vs 假日策略：針對低入住率日，優先以加值（早餐升級、延退）維持
-        ADR，再視需求微調價。
-      </li>
-      <li>
-        高需求日（尖峰）：建議提早加價與設置限制（最少入住晚數、提前天數訂金）。
-      </li>
-      <li>關注 RevPAR：以 RevPAR 最大化為目標平衡「入住率 × ADR」。</li>
-    </ul>
+  <div class="kpi">
+    <div class="kpi-title">收入</div>
+    <div class="kpi-value">
+      ＄<span id="kRevenue"
+        >{{ kpi.room_revenue | number if kpi else '0' }}</span
+      >
+    </div>
+    <div class="kpi-sub">房租收入</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-title">住房率</div>
+    <div class="kpi-value">
+      <span id="kOcc">{{ (kpi.occ_rate)|percent if kpi else '0%' }}</span>
+    </div>
+    <div class="kpi-sub">= 售房合計 / 可售房數</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-title">ADR</div>
+    <div class="kpi-value">
+      ＄<span id="kADR">{{ (kpi.adr)|round(0) if kpi else '0' }}</span>
+    </div>
+    <div class="kpi-sub">= 房租 / 售房</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-title">RevPAR</div>
+    <div class="kpi-value">
+      ＄<span id="kRevPAR">{{ (kpi.revpar)|round(0) if kpi else '0' }}</span>
+    </div>
+    <div class="kpi-sub">= 房租 / 可售房</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-title">OOO 率</div>
+    <div class="kpi-value">
+      <span id="kOOO">{{ (kpi.ooo_rate)|percent if kpi else '0%' }}</span>
+    </div>
+    <div class="kpi-sub">= OOO / 總房間數</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-title">FIT / GIT</div>
+    <div class="kpi-value">
+      <span id="kFIT">{{ kpi.fit if kpi else 0 }}</span> /
+      <span id="kGIT">{{ kpi.git if kpi else 0 }}</span>
+    </div>
+    <div class="kpi-sub">人次合計</div>
   </div>
 </div>
 
-<script>
-  const labels = {{ chart_labels | tojson }};
-  const dsRevenue = {{ chart_data.revenue | tojson }};
-  const dsOcc = {{ chart_data.occ | tojson }};
-  const dsADR = {{ chart_data.adr | tojson }};
-  const dsRevPAR = {{ chart_data.revpar | tojson }};
+<div class="chart-grid">
+  <div class="card">
+    <h3>住房率（%）</h3>
+    <canvas id="occChart"></canvas>
+  </div>
+  <div class="card">
+    <h3>ADR</h3>
+    <canvas id="adrChart"></canvas>
+  </div>
+  <div class="card">
+    <h3>RevPAR</h3>
+    <canvas id="revparChart"></canvas>
+  </div>
+  <div class="card">
+    <h3>房租收入</h3>
+    <canvas id="revChart"></canvas>
+  </div>
+  <div class="card">
+    <h3>可售房 / 售房</h3>
+    <canvas id="roomChart"></canvas>
+  </div>
+  <div class="card">
+    <h3>FIT vs GIT</h3>
+    <canvas id="fitgitChart"></canvas>
+  </div>
+</div>
 
-  const ctx = document.getElementById('trendChart').getContext('2d');
-  new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: labels,
-      datasets: [
-        {label:'總營收', data: dsRevenue, yAxisID:'y1', tension: 0.25},
-        {label:'入住率(%)', data: dsOcc, yAxisID:'y2', tension: 0.25},
-        {label:'ADR', data: dsADR, yAxisID:'y1', tension: 0.25},
-        {label:'RevPAR', data: dsRevPAR, yAxisID:'y1', tension: 0.25}
-      ]
-    },
-    options: {
-      responsive: true,
-      interaction: { mode: 'index', intersect: false },
-      scales: {
-        y1: { type:'linear', position:'left', title:{display:true, text:'金額 (NT$)'}},
-        y2: { type:'linear', position:'right', title:{display:true, text:'入住率 (%)'}, min: 0, max: 100, grid:{drawOnChartArea:false} },
-        x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } }
-      },
-      plugins: {
-        legend: { position: 'top' },
-        tooltip: { callbacks: {
-          label: (ctx) => {
-            const label = ctx.dataset.label || '';
-            const v = ctx.parsed.y ?? 0;
-            if (label.includes('入住率')) return `${label}: ${v.toFixed(2)}%`;
-            return `${label}: ${Math.round(v).toLocaleString('zh-TW')}`;
-          }
-        }}
-      }
+<style>
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .filters label {
+    margin-right: 0.5rem;
+  }
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(180px, 1fr));
+    gap: 12px;
+    margin: 10px 0 20px;
+  }
+  .kpi {
+    background: var(--card-bg, #fff);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  }
+  .kpi-title {
+    font-size: 0.9rem;
+    color: #777;
+  }
+  .kpi-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-top: 6px;
+  }
+  .kpi-sub {
+    font-size: 0.8rem;
+    color: #999;
+  }
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--card-bg, #fff);
+    border-radius: 12px;
+    padding: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  }
+  @media (max-width: 960px) {
+    .kpi-grid {
+      grid-template-columns: repeat(2, 1fr);
     }
-  });
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const $ = (sel) => document.querySelector(sel);
+
+  async function loadData() {
+    const s = $("#startDate").value;
+    const e = $("#endDate").value;
+    const qs = new URLSearchParams();
+    if (s) qs.set("start", s);
+    if (e) qs.set("end", e);
+    const res = await fetch(
+      "/excel/analysis/data" + (qs.toString() ? "?" + qs.toString() : "")
+    );
+    const data = await res.json();
+    // KPI
+    const k = data.kpi || {};
+    $("#kPeriod").textContent = (s || "") + (s || e ? " ~ " : "") + (e || "");
+    $("#kRevenue").textContent = Math.round(
+      k.room_revenue || 0
+    ).toLocaleString();
+    $("#kOcc").textContent = ((k.occ_rate || 0) * 100).toFixed(2) + "%";
+    $("#kADR").textContent = (k.adr || 0).toFixed(0);
+    $("#kRevPAR").textContent = (k.revpar || 0).toFixed(0);
+    $("#kOOO").textContent = ((k.ooo_rate || 0) * 100).toFixed(2) + "%";
+    $("#kFIT").textContent = k.fit || 0;
+    $("#kGIT").textContent = k.git || 0;
+
+    // Charts
+    renderLine("occChart", data.dates, data.occ_rate, "住房率（%）");
+    renderLine("adrChart", data.dates, data.adr, "ADR");
+    renderLine("revparChart", data.dates, data.revpar, "RevPAR");
+    renderBar("revChart", data.dates, data.revenue, "房租收入");
+    renderBars("roomChart", data.dates, [
+      { label: "可售房", data: data.rooms_available },
+      { label: "售房", data: data.rooms_sold },
+    ]);
+    renderBars("fitgitChart", data.dates, [
+      { label: "FIT", data: data.fit },
+      { label: "GIT", data: data.git },
+    ]);
+  }
+
+  let chartRefs = {};
+  function destroyIfExists(id) {
+    if (chartRefs[id]) {
+      chartRefs[id].destroy();
+      chartRefs[id] = null;
+    }
+  }
+
+  function renderLine(id, labels, series, label) {
+    destroyIfExists(id);
+    const ctx = document.getElementById(id);
+    chartRefs[id] = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{ label, data: series, tension: 0.25, fill: false }],
+      },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+        plugins: { legend: { display: false } },
+      },
+    });
+  }
+
+  function renderBar(id, labels, series, label) {
+    destroyIfExists(id);
+    const ctx = document.getElementById(id);
+    chartRefs[id] = new Chart(ctx, {
+      type: "bar",
+      data: { labels, datasets: [{ label: label || "", data: series }] },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+        plugins: { legend: { display: false } },
+      },
+    });
+  }
+
+  function renderBars(id, labels, datasets) {
+    destroyIfExists(id);
+    const ctx = document.getElementById(id);
+    chartRefs[id] = new Chart(ctx, {
+      type: "bar",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        scales: { y: { beginAtZero: true } },
+      },
+    });
+  }
+
+  $("#applyBtn").addEventListener("click", loadData);
+  window.addEventListener("load", loadData);
 </script>
-{% endif %} {% endblock %}
+{% endblock %}

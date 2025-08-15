@@ -1,0 +1,180 @@
+{% extends "base.html" %} {% block title %}{{ page_title or
+"收入與房務指標儀表板" }} - {{ super() }}{% endblock %} {% block content %}
+<style>
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .kpi-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  }
+  .kpi-label {
+    font-size: 14px;
+    color: #6b7280;
+  }
+  .kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+  .panel {
+    background: #fff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+    margin-bottom: 16px;
+  }
+  .filters {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .filters input[type="date"] {
+    padding: 6px 10px;
+    border-radius: 10px;
+    border: 1px solid #d1d5db;
+  }
+  .filters button {
+    border: none;
+    padding: 8px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    background: #1f2937;
+    color: #fff;
+  }
+  .muted {
+    color: #6b7280;
+  }
+</style>
+
+<div class="panel">
+  <h2 style="margin: 0 0 8px 0">收入與房務指標儀表板</h2>
+  <div class="muted">資料來源：{{ data_path }}</div>
+  <form class="filters" method="get" action="">
+    <label>開始</label>
+    <input type="date" name="s_date" value="{{ s_date or '' }}" />
+    <label>結束</label>
+    <input type="date" name="e_date" value="{{ e_date or '' }}" />
+    <button type="submit">套用</button>
+    {% if not has_data %}
+    <span class="muted">目前條件下沒有資料</span>
+    {% endif %}
+  </form>
+
+  {% if error %}
+  <div
+    style="
+      padding: 12px;
+      border: 1px solid #ef4444;
+      color: #b91c1c;
+      border-radius: 12px;
+      background: #fef2f2;
+    "
+  >
+    <strong>讀取失敗：</strong><br />
+    <pre style="white-space: pre-wrap">{{ error }}</pre>
+    <div class="muted" style="margin-top: 6px">
+      提示：請調整 <code>rv_analysis_router.py</code> 的
+      <code>COLUMN_ALIASES</code>。
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-card">
+    <div class="kpi-label">🧾 總收入</div>
+    <div class="kpi-value">{{ summary_fmt.total_revenue }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">🏨 入住率</div>
+    <div class="kpi-value">{{ summary_fmt.occ_pct }}%</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">💳 ADR（平均房價）</div>
+    <div class="kpi-value">{{ summary_fmt.adr }}</div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">📈 RevPAR</div>
+    <div class="kpi-value">{{ summary_fmt.revpar }}</div>
+  </div>
+</div>
+
+<div class="panel">
+  <h3 style="margin-top: 0">趨勢圖</h3>
+  <canvas id="chartRevenue" height="120"></canvas>
+</div>
+
+<div class="panel">
+  <canvas id="chartOcc" height="120"></canvas>
+</div>
+
+<div class="panel">
+  <canvas id="chartADR" height="120"></canvas>
+</div>
+
+<div class="panel">
+  <canvas id="chartRevPAR" height="120"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  const labels = {{ (chart.labels or []) | tojson }};
+  const revenue = {{ (chart.revenue or []) | tojson }};
+  const occ = {{ (chart.occ or []) | tojson }};
+  const adr = {{ (chart.adr or []) | tojson }};
+  const revpar = {{ (chart.revpar or []) | tojson }};
+
+  function mkLineChart(id, lbl, data, ySuffix) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{ label: lbl, data, tension: 0.3, pointRadius: 2 }] },
+      options: {
+        animation: false,
+        responsive: true,
+        scales: { y: { ticks: { callback: (v)=> ySuffix ? (v + ySuffix) : v } } },
+        plugins: {
+          legend: { display: true },
+          tooltip: {
+            callbacks: { label: (ctx) => {
+              const v = ctx.parsed.y;
+              return ySuffix ? `${ctx.dataset.label}: ${v}${ySuffix}` : `${ctx.dataset.label}: ${v}`;
+            }}
+          }
+        }
+      }
+    });
+  }
+
+  mkLineChart('chartRevenue', '收入', revenue, '');
+  mkLineChart('chartOcc', '入住率(%)', occ, '%');
+  mkLineChart('chartADR', 'ADR', adr, '');
+  mkLineChart('chartRevPAR', 'RevPAR', revpar, '');
+</script>
+
+<div class="panel" style="font-size: 12px">
+  <strong>欄位對應（偵測結果）</strong><br />
+  date →
+  <code>{{ mapping.date if mapping and mapping.date else '未偵測' }}</code>　
+  revenue →
+  <code>{{ mapping.revenue if mapping and mapping.revenue else '未偵測' }}</code
+  >　 rooms_sold →
+  <code
+    >{{ mapping.rooms_sold if mapping and mapping.rooms_sold else '未偵測'
+    }}</code
+  >　 rooms_avail →
+  <code
+    >{{ mapping.rooms_avail if mapping and mapping.rooms_avail else '未偵測'
+    }}</code
+  >
+</div>
+{% endblock %}
