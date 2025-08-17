@@ -1,0 +1,526 @@
+{% extends "base.html" %} {% block title %}Excel 分析（MSR02） - {{ super() }}{%
+endblock %} {% block content %}
+
+<div class="page-header">
+  <h2>Excel 分析（MSR02）</h2>
+</div>
+
+<!-- 篩選與操作 -->
+<div class="card rv">
+  <form class="rv-filters" onsubmit="return false;">
+    <div class="rv-row">
+      <div class="rv-field">
+        <label for="start">開始日期</label>
+        <input id="start" type="date" />
+      </div>
+      <div class="rv-field">
+        <label for="end">結束日期</label>
+        <input id="end" type="date" />
+      </div>
+      <div class="rv-actions">
+        <button id="apply" class="button button-primary" type="button">
+          🔎 套用
+        </button>
+        <button id="reset" class="button" type="button">♻️ 全期間</button>
+        <button id="resetZoom" class="button" type="button">🔍 重置縮放</button>
+      </div>
+    </div>
+    <div class="rv-hint">
+      縮放：<b>Ctrl + 滾輪</b>、<b>拖曳框選</b>、<b>雙指</b>、<b>Shift 拖移</b
+      >；<b>雙擊圖表</b>重置。
+    </div>
+  </form>
+
+  <!-- 找不到日期欄位的備援 UI -->
+  <div id="dateHelper" class="rv-helper" style="display: none">
+    <div>
+      <strong>⚠️ 找不到日期欄位</strong> —
+      請選擇哪一欄是日期（建議「傳票日期」）。
+    </div>
+    <div class="rv-helper-row">
+      <label for="dateCol">日期欄位：</label>
+      <select id="dateCol"></select>
+      <button id="retryBtn" class="button" type="button">
+        ✅ 套用日期欄位並重試
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- KPI 區 -->
+<div class="card rv">
+  <div class="rv-kpi">
+    <div class="rv-kpi-item">
+      <div class="rv-kpi-name">💰 總收入</div>
+      <div class="rv-kpi-val" id="kpi_total_rev">-</div>
+    </div>
+    <div class="rv-kpi-item">
+      <div class="rv-kpi-name">🛏️ 房租收入</div>
+      <div class="rv-kpi-val" id="kpi_room_rev">-</div>
+    </div>
+    <div class="rv-kpi-item">
+      <div class="rv-kpi-name">🏨 住房率</div>
+      <div class="rv-kpi-val" id="kpi_occ">-</div>
+    </div>
+    <div class="rv-kpi-item">
+      <div class="rv-kpi-name">🏷 ADR</div>
+      <div class="rv-kpi-val" id="kpi_adr">-</div>
+    </div>
+    <div class="rv-kpi-item">
+      <div class="rv-kpi-name">📈 RevPAR</div>
+      <div class="rv-kpi-val" id="kpi_revpar">-</div>
+    </div>
+  </div>
+</div>
+
+<!-- 圖表 -->
+<div class="card rv">
+  <canvas id="revChart" height="96"></canvas>
+</div>
+<div class="card rv" style="margin-top: 12px">
+  <canvas id="occChart" height="96"></canvas>
+</div>
+
+<!-- Top 表 -->
+<div class="card rv" style="margin-top: 12px">
+  <div class="page-header" style="margin: 0 0 10px">
+    <h3>🔝 Top 通路 / 方案 / 市場</h3>
+  </div>
+  <div class="table-responsive" id="tables"></div>
+</div>
+
+<!-- 只在內容區載入 Script，不影響 base.html -->
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.umd.min.js"></script>
+
+<style>
+  /* 風格僅作用於 .rv 容器，避免影響全站 */
+  .rv .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+  }
+  .rv table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .rv th,
+  .rv td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+  }
+  .rv th {
+    background: #f9fafb;
+    font-weight: 600;
+  }
+  .rv-filters .rv-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .rv-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 180px;
+  }
+  .rv-actions {
+    display: flex;
+    gap: 10px;
+  }
+  .rv-hint {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin-top: 8px;
+  }
+  .rv-helper {
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 12px;
+  }
+  .rv-helper-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+  .rv-kpi {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+  .rv-kpi-item {
+    background: #1f2937;
+    color: #fff;
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .rv-kpi-name {
+    opacity: 0.9;
+    margin-bottom: 4px;
+  }
+  .rv-kpi-val {
+    font-size: 22px;
+    font-weight: 700;
+  }
+  @media (max-width: 1100px) {
+    .rv-kpi {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+</style>
+
+<script>
+  // —— 安全註冊 zoom 插件（載不到也不報錯）——
+  (function () {
+    try {
+      let zp =
+        (window && (window["chartjs-plugin-zoom"] || window.ChartZoom)) || null;
+      if (zp && zp.default) zp = zp.default;
+      if (zp && Chart && Chart.register) Chart.register(zp);
+    } catch (e) {
+      console.warn(
+        "zoom plugin not available; charts will render without zoom.",
+        e
+      );
+    }
+  })();
+
+  let revChart, occChart;
+  let forcedDateCol = null;
+  let lastPayload = null;
+
+  // 工具
+  function fmtMoney(n) {
+    if (n === null || n === undefined || isNaN(n)) return "-";
+    return Math.round(n).toLocaleString();
+  }
+  function fmtPct(n) {
+    if (n === null || n === undefined || isNaN(n)) return "-";
+    return n.toFixed(1) + "%";
+  }
+  function moneyTick(v) {
+    const a = Math.abs(v);
+    if (a >= 1_000_000) return (v / 1_000_000).toFixed(1) + "M";
+    if (a >= 1_000) return (v / 1_000).toFixed(0) + "k";
+    return v;
+  }
+  function getMinMax(arr) {
+    const vals = (arr || []).filter(
+      (v) => typeof v === "number" && isFinite(v)
+    );
+    if (!vals.length) return { min: 0, max: 1 };
+    const nz = vals.filter((v) => v !== 0);
+    const use = nz.length ? nz : vals;
+    let min = Math.min(...use),
+      max = Math.max(...use);
+    if (min === max) {
+      min = min * 0.95;
+      max = max * 1.05;
+    }
+    return { min, max };
+  }
+
+  // 渲染
+  function renderAll(data) {
+    lastPayload = data;
+    // KPI
+    document.getElementById("kpi_total_rev").innerText = fmtMoney(
+      data.kpi.total_rev
+    );
+    document.getElementById("kpi_room_rev").innerText = fmtMoney(
+      data.kpi.room_rev
+    );
+    document.getElementById("kpi_occ").innerText = fmtPct(data.kpi.occ * 100);
+    document.getElementById("kpi_adr").innerText = fmtMoney(data.kpi.adr);
+    document.getElementById("kpi_revpar").innerText = fmtMoney(data.kpi.revpar);
+
+    // 圖一：收入（動態 y 軸 + 縮放）
+    const labels = data.ts.date;
+    const revAll = [...(data.ts.total_rev || []), ...(data.ts.room_rev || [])];
+    const { min: revMin, max: revMax } = getMinMax(revAll);
+    const ctx1 = document.getElementById("revChart").getContext("2d");
+    if (revChart) revChart.destroy();
+    revChart = new Chart(ctx1, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "總收入",
+            data: data.ts.total_rev,
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 2,
+          },
+          {
+            label: "房租收入",
+            data: data.ts.room_rev,
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 2,
+          },
+          {
+            label: "MA-7",
+            data: data.ts.ma7_rev,
+            borderWidth: 1,
+            borderDash: [5, 4],
+            tension: 0.25,
+            pointRadius: 0,
+          },
+          {
+            label: "MA-28",
+            data: data.ts.ma28_rev,
+            borderWidth: 1,
+            borderDash: [2, 4],
+            tension: 0.25,
+            pointRadius: 0,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: (c) =>
+                ` ${c.dataset.label}: ${
+                  c.raw === null ? "-" : fmtMoney(c.raw)
+                }`,
+            },
+          },
+          zoom: {
+            limits: { y: { min: "original", max: "original" } },
+            pan: { enabled: true, mode: "xy", modifierKey: "shift" },
+            zoom: {
+              wheel: { enabled: true, modifierKey: "ctrl" },
+              pinch: { enabled: true },
+              drag: { enabled: true },
+              mode: "xy",
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            suggestedMin: revMin * 0.95,
+            suggestedMax: revMax * 1.05,
+            ticks: { callback: moneyTick },
+          },
+          x: { ticks: { maxRotation: 0, autoSkip: true } },
+        },
+      },
+    });
+    document.getElementById("revChart").ondblclick = () =>
+      revChart?.resetZoom?.();
+
+    // 圖二：雙軸（左：Occ%，右：金額）
+    const ctx2 = document.getElementById("occChart").getContext("2d");
+    if (occChart) occChart.destroy();
+    const moneyAll = [...(data.ts.adr || []), ...(data.ts.revpar || [])].filter(
+      (v) => typeof v === "number"
+    );
+    const { min: mMin, max: mMax } = getMinMax(moneyAll);
+    occChart = new Chart(ctx2, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Occupancy %",
+            data: data.ts.occ,
+            yAxisID: "yOcc",
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 2,
+          },
+          {
+            label: "ADR",
+            data: data.ts.adr,
+            yAxisID: "yMoney",
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 2,
+          },
+          {
+            label: "RevPAR",
+            data: data.ts.revpar,
+            yAxisID: "yMoney",
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: 2,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: (c) =>
+                c.dataset.yAxisID === "yOcc"
+                  ? ` ${c.dataset.label}: ${
+                      c.raw === null ? "-" : c.raw.toFixed(1) + "%"
+                    }`
+                  : ` ${c.dataset.label}: ${
+                      c.raw === null ? "-" : fmtMoney(c.raw)
+                    }`,
+            },
+          },
+          zoom: {
+            limits: {
+              yOcc: { min: "original", max: "original" },
+              yMoney: { min: "original", max: "original" },
+            },
+            pan: { enabled: true, mode: "xy", modifierKey: "shift" },
+            zoom: {
+              wheel: { enabled: true, modifierKey: "ctrl" },
+              pinch: { enabled: true },
+              drag: { enabled: true },
+              mode: "xy",
+            },
+          },
+        },
+        scales: {
+          yOcc: {
+            position: "left",
+            min: 0,
+            max: 100,
+            ticks: { callback: (v) => v + "%" },
+            grid: { drawOnChartArea: true },
+          },
+          yMoney: {
+            position: "right",
+            suggestedMin: mMin * 0.95,
+            suggestedMax: mMax * 1.05,
+            ticks: { callback: moneyTick },
+            grid: { drawOnChartArea: false },
+          },
+          x: { ticks: { maxRotation: 0, autoSkip: true } },
+        },
+      },
+    });
+    document.getElementById("occChart").ondblclick = () =>
+      occChart?.resetZoom?.();
+
+    // Top 表
+    const wrap = document.getElementById("tables");
+    function buildTable(title, rows) {
+      if (!rows || rows.length === 0) return "";
+      const head = Object.keys(rows[0]);
+      const thead =
+        "<tr>" + head.map((h) => `<th>${h}</th>`).join("") + "</tr>";
+      const tbody = rows
+        .map(
+          (r) =>
+            "<tr>" +
+            head.map((h) => `<td>${r[h] ?? ""}</td>`).join("") +
+            "</tr>"
+        )
+        .join("");
+      return `<h4 style="margin:6px 0 8px;">${title}</h4><div class="table-responsive"><table><thead>${thead}</thead><tbody>${tbody}</tbody></table></div>`;
+    }
+    wrap.innerHTML = [
+      buildTable("通路", data.top_channel),
+      buildTable("方案", data.top_rate_plan),
+      buildTable("市場", data.top_segment),
+    ].join("");
+  }
+
+  // 讀欄位資訊（日期欄位協助）
+  async function fetchColumns() {
+    const res = await fetch("/rv/api/columns");
+    if (!res.ok) return null;
+    return await res.json();
+  }
+  function showDateHelper(data) {
+    const box = document.getElementById("dateHelper");
+    const sel = document.getElementById("dateCol");
+    sel.innerHTML = "";
+    const cols = data?.columns || [];
+    const priority = (data?.date_candidates || []).map((x) => x.column);
+    const ordered = Array.from(new Set([...(priority || []), ...cols]));
+    ordered.forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = c;
+      if (/傳票|日期/i.test(c)) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    box.style.display = "block";
+  }
+  function hideDateHelper() {
+    document.getElementById("dateHelper").style.display = "none";
+  }
+
+  // 取資料
+  async function loadOverview() {
+    const start = document.getElementById("start").value;
+    const end = document.getElementById("end").value;
+    const qs = new URLSearchParams();
+    if (start) qs.set("start", start);
+    if (end) qs.set("end", end);
+    if (forcedDateCol) qs.set("date_col", forcedDateCol);
+
+    const res = await fetch(
+      "/rv/api/overview" + (qs.toString() ? "?" + qs.toString() : "")
+    );
+    if (!res.ok) {
+      let txt = await res.text();
+      try {
+        const j = JSON.parse(txt);
+        txt = j.detail || txt;
+      } catch (e) {}
+      if (String(txt).includes("日期欄位")) {
+        const cols = await fetchColumns();
+        showDateHelper(cols);
+      }
+      alert("讀取失敗：" + txt);
+      return;
+    }
+    hideDateHelper();
+    const data = await res.json();
+    renderAll(data);
+  }
+
+  // 綁定事件
+  document.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("apply").addEventListener("click", loadOverview);
+    document.getElementById("reset").addEventListener("click", () => {
+      document.getElementById("start").value = "";
+      document.getElementById("end").value = "";
+      forcedDateCol = null;
+      revChart?.resetZoom?.();
+      occChart?.resetZoom?.();
+      loadOverview();
+    });
+    document.getElementById("resetZoom").addEventListener("click", () => {
+      if (revChart?.resetZoom || occChart?.resetZoom) {
+        revChart?.resetZoom?.();
+        occChart?.resetZoom?.();
+      } else if (lastPayload) {
+        renderAll(lastPayload);
+      }
+    });
+    const retryBtn = document.getElementById("retryBtn");
+    if (retryBtn)
+      retryBtn.addEventListener("click", () => {
+        const sel = document.getElementById("dateCol");
+        forcedDateCol = sel ? sel.value || null : null;
+        loadOverview();
+      });
+
+    // 首次載入
+    loadOverview();
+  });
+</script>
+
+{% endblock %}

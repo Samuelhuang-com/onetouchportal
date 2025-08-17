@@ -1,0 +1,891 @@
+{% extends "base.html" %} {% block title %}MSR02 Excel 檢視 - {{ super() }}{%
+endblock %} {% block content %}
+<style>
+  /* --- 捲軸與桌面樣式（比照參考頁） --- */
+  .table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .table-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+  .table-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+  .table-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+
+  /* 版面容器 */
+  .page-wrap {
+    background: #f3f4f6;
+    padding: 1rem;
+  }
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  .page-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0 0 1rem 0;
+  }
+
+  /* 表格外層（高度限制＋可捲動） */
+  .table-container {
+    background: #fff;
+    border-radius: 0.5rem;
+    overflow: auto;
+    box-shadow: 0 1px 10px rgba(0, 0, 0, 0.08);
+    max-height: 70vh;
+  }
+
+  /* 表格樣式（貼齊參考頁的緊湊風格） */
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    color: #4b5563;
+    font-size: 0.9rem;
+    table-layout: fixed;
+  }
+  thead th,
+  tbody td {
+    padding: .45rem .6rem;
+    white-space: nowrap;
+    border-bottom: 1px solid #e5e7eb;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #e5e7eb;
+    color: #374151;
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 0.70rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    text-overflow: clip;
+    line-height: 1.5;
+  }
+  tbody tr:hover td {
+    background: #f9fafb;
+  }
+
+  /* 分頁控制（同參考頁配置與文案） */
+  .pagination {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+  }
+  .btn {
+    border: 0;
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+  }
+  .btn-primary {
+    background: #2563eb;
+    color: #fff;
+    transition: background 0.15s ease;
+  }
+  .btn-primary:hover {
+    background: #1d4ed8;
+  }
+  .btn:disabled {
+    background: #9ca3af;
+    cursor: not-allowed;
+  }
+  .btn-left {
+    border-radius: 0.5rem 0 0 0.5rem;
+  }
+  .btn-right {
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
+  .page-info {
+    font-size: 0.9rem;
+    color: #374151;
+    background: #fff;
+    padding: 0.5rem 1rem;
+    border-top: 1px solid #d1d5db;
+    border-bottom: 1px solid #d1d5db;
+  }
+
+  /* --- 凍結第一欄（日期）--- */
+  thead th:first-child,
+  tbody td:first-child {
+    position: sticky;
+    left: 0;
+    background: #fff;
+    background-clip: padding-box;
+    min-width: 110px;
+    white-space: nowrap;
+  }
+  thead th:first-child {
+    top: 0;
+    z-index: 20;
+    background: #e5e7eb;
+  }
+  tbody td:first-child {
+    z-index: 5;
+    box-shadow: 2px 0 0 #e5e7eb;
+  }
+
+  /* === 點擊高亮：螢光黃 === */
+  :root {
+    --hl-yellow: #fff455;
+  }
+  table.data-table tr.hl-row > td {
+    background: var(--hl-yellow) !important;
+    color: #111;
+  }
+  table.data-table th.hl-col,
+  table.data-table td.hl-col {
+    background: var(--hl-yellow) !important;
+    color: #111;
+  }
+  thead th:first-child.hl-col,
+  tbody td:first-child.hl-col {
+    z-index: 25;
+  }
+
+  /* --- 趨勢圖 Modal --- */
+  .chart-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1000;
+  }
+  .chart-card {
+    background: #fff;
+    width: min(1100px, 92vw);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+  }
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .chart-title {
+    font-weight: 700;
+    font-size: 1rem;
+  }
+  .chart-close {
+    border: 0;
+    background: none;
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+  }
+  .chart-body {
+    padding: 12px 16px;
+  }
+  .chart-note {
+    color: #6b7280;
+    font-size: 0.85rem;
+    padding: 0 16px 16px;
+  }
+  /* 疊加選取欄位高亮（與單欄高亮並存） */
+  table.data-table th.hl-col-ov,
+  table.data-table td.hl-col-ov {
+    background: var(--hl-yellow) !important;
+    color: #111;
+  }
+  thead th:first-child.hl-col-ov,
+  tbody td:first-child.hl-col-ov {
+    z-index: 25;
+  }
+  /* 右側最後一欄（加總/平均）固定 */
+  thead th:last-child {
+    position: sticky;
+    right: 0;
+    top: 0;
+    background: #e5e7eb;
+    z-index: 22;
+  }
+  tbody td:last-child {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    box-shadow: -2px 0 0 #e5e7eb;
+    z-index: 6;
+  }
+
+  /* Chart 工具列與勾選清單 */
+  .chart-toolbar {
+    padding: 10px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #fafafa;
+  }
+  .chart-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .chart-controls .btn {
+    background: #374151;
+    color: #fff;
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+  .chart-controls .btn.secondary {
+    background: #6b7280;
+  }
+  .series-checklist {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 6px;
+    max-height: 160px;
+    overflow: auto;
+    padding: 6px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  .series-checklist label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.9rem;
+    color: #374151;
+  }
+  /* 底部縱向平均列（Sticky Bottom） */
+  tbody tr.summary-row td {
+    position: sticky;
+    bottom: 0;
+    background: #eef2ff;
+    font-weight: 700;
+    border-top: 2px solid #c7d2fe;
+  }
+  /* 與左/右側 sticky 欄位並存的層級 */
+  tbody tr.summary-row td:first-child {
+    z-index: 30;
+  }
+  tbody tr.summary-row td:last-child {
+    z-index: 30;
+  }
+</style>
+
+<div class="page-wrap">
+  <div class="container">
+    <h1 class="page-title">資料呈現（MSR02）</h1>
+
+    {% if error %}
+    <div
+      style="
+        background: #fde2e1;
+        border: 1px solid #f9b5b2;
+        color: #7f1d1d;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 16px;
+      "
+    >
+      ⚠️ {{ error }}
+    </div>
+    {% else %} {% if records and columns %}
+
+    <!-- 表格容器（70vh，高度可捲動；表頭 sticky） -->
+    <div id="table-wrapper" class="table-container">
+      <table id="data-table" class="data-table">
+        <colgroup id="colgroup"></colgroup>
+        <thead>
+          <tr id="table-header">
+            {% for col in columns %}
+            <th scope="col" title="{{ col }}">{{ col }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          {% for row in records %}
+          <tr>
+            {% for col in columns %}
+            <td title="{{ row[col] }}">{{ row[col] }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 分頁控制（比照參考頁文案與圖示） -->
+    <div class="pagination">
+      <button id="prev-page" class="btn btn-primary btn-left">
+        <svg
+          style="width: 8px; height: 8px; margin-right: 6px"
+          aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 14 10"
+        >
+          <path
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M13 5H1m0 0l4 4M1 5l4-4"
+          />
+        </svg>
+        上一頁
+      </button>
+      <span id="page-info" class="page-info"></span>
+      <button id="next-page" class="btn btn-primary btn-right">
+        下一頁
+        <svg
+          style="width: 14px; height: 14px; margin-left: 6px"
+          aria-hidden="true"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 14 10"
+        >
+          <path
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M1 5h12m0 0L9 1m4 4L9 9"
+          />
+        </svg>
+      </button>
+    </div>
+
+    <div
+      style="
+        text-align: center;
+        margin-top: 0.5rem;
+        color: #6b7280;
+        font-size: 0.85rem;
+      "
+    >
+      共 {{ total_rows or (records|length) }} 筆資料
+    </div>
+
+    {% else %}
+    <div style="text-align: center; padding: 40px; color: #666">
+      沒有可顯示的資料
+    </div>
+    {% endif %} {% endif %}
+  </div>
+</div>
+
+<!-- 趨勢圖 Modal -->
+<div id="chart-modal" class="chart-modal" aria-hidden="true">
+  <div class="chart-card">
+    <div class="chart-header">
+      <div id="chart-title" class="chart-title">趨勢圖</div>
+      <button id="chart-close" class="chart-close" aria-label="關閉">✕</button>
+    </div>
+    <div class="chart-toolbar">
+      <div class="chart-controls">
+        <button id="select-all" class="btn secondary">全選</button>
+        <button id="clear-all" class="btn secondary">清除</button>
+        <button id="update-chart" class="btn">更新圖表</button>
+        <button id="download-png" class="btn">下載 PNG</button>
+        <button id="download-csv" class="btn">下載 CSV</button>
+      </div>
+      <div id="series-checklist" class="series-checklist"></div>
+    </div>
+    <div class="chart-body">
+      <canvas id="trend-canvas" height="360"></canvas>
+    </div>
+    <div id="chart-note" class="chart-note"></div>
+  </div>
+</div>
+
+<script>
+  // === 參數 ===
+  const rowsPerPage = 31; // 每頁筆數
+  const SUMMARY_LABEL = "平均(數值欄)"; // 右側最後一欄標題（要改合計可換字並改計算）
+
+  let currentPage = 1;
+
+  // DOM
+  const table = document.getElementById("data-table");
+  const tableBody = document.getElementById("table-body");
+  const theadRow = document.getElementById("table-header");
+  const pageInfo = document.getElementById("page-info");
+  const prevBtn = document.getElementById("prev-page");
+  const nextBtn = document.getElementById("next-page");
+
+  // 原始 <tr>（尚未包含最後一欄）
+  const allRows = Array.from(tableBody.querySelectorAll("tr"));
+  allRows.forEach((tr, i) => (tr.dataset.rowid = i));
+
+  // 高亮狀態
+  let selectedColIndex = null; // 單格 X/Y 高亮
+  let selectedRowId = null;
+  window.overlayCols = window.overlayCols || new Set(); // 多欄疊加（圖表）用
+
+  // 百分比判斷 & 千分位設定
+  const isPercentColName = (name) => /[%％]|率/.test(name);
+  const skipCols = new Set([0]); // 例如第 0 欄：日期
+  function shouldFormatThousands(colIndex, text) {
+    if (skipCols.has(colIndex)) return false;
+    const headerCells = Array.from(theadRow.children);
+    const colName = headerCells[colIndex]?.textContent?.trim() || "";
+    if (isPercentColName(colName)) return false;
+    const num = Number(String(text).replace(/[, ]/g, ""));
+    if (!Number.isFinite(num)) return false;
+    return Math.abs(num) >= 1000 || String(text).includes(",");
+  }
+  function toThousands(text) {
+    const num = Number(String(text).replace(/[, ]/g, ""));
+    return Number.isFinite(num) ? num.toLocaleString("en-US") : text;
+  }
+
+  // === 新增最後一欄（每列的平均/合計；右側 sticky） ===
+  let summaryValues = [];
+  function addSummaryHeader() {
+    const th = document.createElement("th");
+    th.textContent = SUMMARY_LABEL;
+    th.title = SUMMARY_LABEL;
+    theadRow.appendChild(th);
+  }
+  function computeSummaryValues() {
+    const headerCells = Array.from(theadRow.children);
+    const lastIndex = headerCells.length - 1; // 新增欄位索引
+    summaryValues = allRows.map((tr) => {
+      let sum = 0,
+        count = 0;
+      const tds = tr.children;
+      for (let i = 0; i < lastIndex; i++) {
+        if (i === 0 || i === 1) continue; // 排除日期/星期等
+        const name = headerCells[i]?.textContent?.trim() || "";
+        if (isPercentColName(name)) continue; // 不納入百分比欄
+        const n = Number(
+          String(tds[i]?.textContent || "").replace(/[, ]/g, "")
+        );
+        if (Number.isFinite(n)) {
+          sum += n;
+          count++;
+        }
+      }
+      if (!count) return null;
+      const avg = sum / count; // 改成合計：直接 return sum
+      return avg;
+    });
+  }
+
+  // === 縱向平均（每欄跨 1~31 天的平均；全月計算，不受分頁影響） ===
+  let verticalSummary = [];
+  function parseCellNumber(colIndex, text) {
+    const headerCells = Array.from(theadRow.children);
+    const name = headerCells[colIndex]?.textContent?.trim() || "";
+    let s = String(text).trim();
+    if (isPercentColName(name)) s = s.replace(/[,%％\s]/g, ""); // 去掉 % 與逗號
+    else s = s.replace(/[, \u00A0]/g, "");
+    const n = Number(s);
+    return Number.isFinite(n) ? n : null;
+  }
+  function computeVerticalSummary() {
+    const headerCells = Array.from(theadRow.children);
+    const colCount = headerCells.length;
+    const lastIdx = colCount - 1; // 右側「平均(數值欄)」
+    verticalSummary = new Array(colCount).fill(null);
+    for (let c = 0; c < colCount; c++) {
+      const name = headerCells[c]?.textContent?.trim() || "";
+      if (c === 0 || c === 1 || c === lastIdx || !name) continue; // 跳過：日期/星期/最後一欄
+      let sum = 0,
+        cnt = 0;
+      allRows.forEach((tr) => {
+        const t = tr.children[c]?.textContent ?? "";
+        const v = parseCellNumber(c, t);
+        if (v !== null) {
+          sum += v;
+          cnt++;
+        }
+      });
+      if (cnt) verticalSummary[c] = sum / cnt; // 平均
+    }
+  }
+  function appendSummaryRow() {
+    const old = tableBody.querySelector("tr.summary-row");
+    if (old) old.remove();
+    const headerCells = Array.from(theadRow.children);
+    const colCount = headerCells.length;
+    const tr = document.createElement("tr");
+    tr.className = "summary-row";
+    for (let c = 0; c < colCount; c++) {
+      const td = document.createElement("td");
+      if (c === 0) {
+        td.textContent = "縱向平均（" + allRows.length + "天）";
+        td.title = td.textContent;
+      } else if (verticalSummary[c] != null) {
+        const name = headerCells[c].textContent.trim();
+        const val = verticalSummary[c];
+        td.textContent = isPercentColName(name)
+          ? val.toFixed(2) + "%"
+          : Number(val).toLocaleString("en-US");
+        td.title = td.textContent;
+      } else {
+        td.textContent = "";
+      }
+      tr.appendChild(td);
+    }
+    tableBody.appendChild(tr);
+  }
+
+  function renderPage() {
+    const totalRows = allRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+
+    if (currentPage < 1) currentPage = 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = Math.min(startIndex + rowsPerPage, totalRows);
+
+    tableBody.innerHTML = "";
+    for (let i = startIndex; i < endIndex; i++) {
+      const clone = allRows[i].cloneNode(true);
+      // 右側最後一欄（本列平均/合計）
+      const td = document.createElement("td");
+      const v = summaryValues[i];
+      td.textContent = v == null ? "" : v.toLocaleString("en-US");
+      td.title = td.textContent;
+      clone.appendChild(td);
+      tableBody.appendChild(clone);
+    }
+
+    // ✅ 追加底部「縱向平均」列（整月，不受分頁影響）
+    appendSummaryRow();
+
+    // 千分位（非百分比欄）
+    formatNumbersInPage();
+
+    pageInfo.textContent = `第 ${currentPage} 頁 / 共 ${totalPages} 頁`;
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+
+    applyHighlights();
+  }
+
+  prevBtn.addEventListener("click", () => {
+    if (currentPage > 1) {
+      currentPage--;
+      renderPage();
+    }
+  });
+  nextBtn.addEventListener("click", () => {
+    const totalPages = Math.ceil(allRows.length / rowsPerPage);
+    if (currentPage < totalPages) {
+      currentPage++;
+      renderPage();
+    }
+  });
+
+  // 高亮：清除＋套用
+  function clearHighlightsInCurrentPage() {
+    tableBody
+      .querySelectorAll("tr.hl-row")
+      .forEach((tr) => tr.classList.remove("hl-row"));
+    theadRow
+      .querySelectorAll("th.hl-col")
+      .forEach((th) => th.classList.remove("hl-col"));
+    tableBody
+      .querySelectorAll("td.hl-col")
+      .forEach((td) => td.classList.remove("hl-col"));
+    theadRow
+      .querySelectorAll("th.hl-col-ov")
+      .forEach((th) => th.classList.remove("hl-col-ov"));
+    tableBody
+      .querySelectorAll("td.hl-col-ov")
+      .forEach((td) => td.classList.remove("hl-col-ov"));
+  }
+  function applyHighlights() {
+    clearHighlightsInCurrentPage();
+
+    if (selectedColIndex !== null) {
+      const ths = Array.from(theadRow.children);
+      if (ths[selectedColIndex]) ths[selectedColIndex].classList.add("hl-col");
+      tableBody.querySelectorAll("tr").forEach((tr) => {
+        const tds = tr.children;
+        if (tds[selectedColIndex])
+          tds[selectedColIndex].classList.add("hl-col");
+      });
+    }
+
+    if (window.overlayCols && window.overlayCols.size) {
+      const colsArr = Array.from(window.overlayCols);
+      const ths = Array.from(theadRow.children);
+      colsArr.forEach((ci) => {
+        if (ths[ci]) ths[ci].classList.add("hl-col-ov");
+      });
+      tableBody.querySelectorAll("tr").forEach((tr) => {
+        const tds = tr.children;
+        colsArr.forEach((ci) => {
+          if (tds[ci]) tds[ci].classList.add("hl-col-ov");
+        });
+      });
+    }
+
+    if (selectedRowId !== null) {
+      const targetTr = tableBody.querySelector(
+        `tr[data-rowid="${selectedRowId}"]`
+      );
+      if (targetTr) targetTr.classList.add("hl-row");
+    }
+  }
+
+  // 點擊資料格：X/Y 高亮
+  tableBody.addEventListener("click", (ev) => {
+    const td = ev.target.closest("td");
+    if (!td) return;
+    const tr = td.parentElement;
+    const colIndex = td.cellIndex;
+    const rowId = tr.dataset.rowid ? Number(tr.dataset.rowid) : null;
+
+    const isSame = selectedColIndex === colIndex && selectedRowId === rowId;
+    if (isSame) {
+      selectedColIndex = null;
+      selectedRowId = null;
+    } else {
+      selectedColIndex = colIndex;
+      selectedRowId = rowId;
+    }
+    applyHighlights();
+  });
+
+  // 千分位套用（非百分比欄位）
+  function formatNumbersInPage() {
+    tableBody.querySelectorAll("tr").forEach((tr) => {
+      Array.from(tr.children).forEach((td, i) => {
+        const raw = td.textContent.trim();
+        if (shouldFormatThousands(i, raw)) td.textContent = toThousands(raw);
+      });
+    });
+  }
+
+  // 欄寬估算並套用到 <colgroup>
+  function computeAndApplyColWidths() {
+    const colCount = document.getElementById("table-header").children.length;
+    const cg = document.getElementById("colgroup");
+    if (!cg) return;
+
+    const sampleCell =
+      document.querySelector("#table-body td") ||
+      document.querySelector("#table-header th");
+    const cs = window.getComputedStyle(sampleCell);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+
+    const maxPx = new Array(colCount).fill(0);
+    allRows.forEach((tr) => {
+      Array.from(tr.children).forEach((td, i) => {
+        const txt = td.textContent || "";
+        const w = ctx.measureText(txt).width + padX + 20;
+        if (w > maxPx[i]) maxPx[i] = w;
+      });
+    });
+
+    const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+    if (maxPx[0] < 110) maxPx[0] = 110; // 左側日期欄
+    if (maxPx[colCount - 1] < 120) maxPx[colCount - 1] = 140; // 右側「平均」欄
+
+    cg.innerHTML = "";
+    for (let i = 0; i < colCount; i++) {
+      const col = document.createElement("col");
+      col.style.width = `${clamp(Math.ceil(maxPx[i]), 70, 280)}px`;
+      cg.appendChild(col);
+    }
+  }
+
+  // 初始化：加表頭 → 算每列平均 → 算每欄縱向平均 → 算欄寬 → 首渲染
+  addSummaryHeader();
+  computeSummaryValues();
+  computeVerticalSummary();
+  computeAndApplyColWidths();
+  renderPage();
+</script>
+
+<!-- Chart.js（CDN 版；若內網封閉可改放到 /static/js） -->
+<script src="{{ url_for('static', path='js/chart.4.4.3.min.js') }}"></script>
+<script>
+    // === 表頭點擊開趨勢圖（支援勾選清單、匯出 PNG/CSV） ===
+    const _isPercentColName = (typeof isPercentColName === 'function') ? isPercentColName : (name) => /[%％]|率/.test(name);
+    const ths = Array.from(document.getElementById('table-header').children);
+
+    const modal    = document.getElementById('chart-modal');
+    const closeBtn = document.getElementById('chart-close');
+    const checklist= document.getElementById('series-checklist');
+    const btnAll   = document.getElementById('select-all');
+    const btnClr   = document.getElementById('clear-all');
+    const btnUpd   = document.getElementById('update-chart');
+    const btnPNG   = document.getElementById('download-png');
+    const btnCSV   = document.getElementById('download-csv');
+
+    function openModal(){ modal.style.display='flex'; }
+    function closeModal(){ modal.style.display='none'; }
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+    let trendChart = null;
+
+    // 允許加入圖的欄位（排除：日期、第二欄、最後一欄「平均」）
+    const lastIndex = ths.length - 1;
+    const selectableIdx = ths.map((th,i)=>i).filter(i => i !== 0 && i !== 1 && i !== lastIndex);
+
+    // 產生勾選清單
+    function buildChecklist() {
+      const html = selectableIdx.map(i => {
+        const name = ths[i].textContent.trim();
+        const checked = window.overlayCols && window.overlayCols.has(i) ? 'checked' : '';
+        return '<label><input type="checkbox" value="'+i+'" '+checked+'/> '+name+'</label>';
+      }).join('');
+      checklist.innerHTML = html || '<div style="color:#6b7280">（無可選欄位）</div>';
+    }
+    function selectedColsFromChecklist(){
+      return Array.from(checklist.querySelectorAll('input[type="checkbox"]:checked')).map(el => Number(el.value));
+    }
+
+    btnAll.addEventListener('click', ()=>{ checklist.querySelectorAll('input[type="checkbox"]').forEach(el=> el.checked = true); });
+    btnClr.addEventListener('click', ()=>{ checklist.querySelectorAll('input[type="checkbox"]').forEach(el=> el.checked = false); });
+    btnUpd.addEventListener('click', ()=>{
+      const cols = selectedColsFromChecklist();
+      if (!cols.length) return;
+      window.overlayCols = new Set(cols);
+      buildAndShowChart(cols);
+    });
+
+    function buildAndShowChart(cols){
+      if (!cols.length) return;
+
+      // 橫軸：日期
+      const labels = [];
+      allRows.forEach(tr => { const d = tr.children[0]?.textContent?.trim() ?? ''; if (d) labels.push(d); });
+
+      const datasets = [];
+      let hasPercent = false, hasNumber = false;
+      cols.forEach(ci => {
+        const name = ths[ci].textContent.trim();
+        const isPct = _isPercentColName(name);
+        if (isPct) hasPercent = true; else hasNumber = true;
+
+        const values = [];
+        allRows.forEach(tr => {
+          const vText = tr.children[ci]?.textContent?.trim() ?? '';
+          const n = Number(String(vText).replace(/,/g, ''));
+          values.push(Number.isFinite(n) ? n : null);
+        });
+
+        datasets.push({ label: name, data: values, tension: 0.2, pointRadius: 2, yAxisID: (isPct && hasNumber) ? 'y1' : 'y' });
+      });
+
+      const ctx = document.getElementById('trend-canvas').getContext('2d');
+      if (trendChart) trendChart.destroy();
+
+      // 若 Chart.js 未載入，也能讓彈窗開啟並提示
+      if (!window.Chart) {
+        document.getElementById('chart-title').textContent = '趨勢圖（需要 Chart.js）';
+        document.getElementById('chart-note').textContent = '找不到 Chart.js，請確認已放置於 static/js/chart.4.4.3.min.js。';
+        openModal();
+        return;
+      }
+
+      const scales = {};
+      if (hasNumber) { scales.y = { title: { display: true, text: '數值' }, ticks: { callback: v => (v && v.toLocaleString ? v.toLocaleString() : v) } }; }
+      if (hasPercent) { const key = hasNumber ? 'y1' : 'y'; scales[key] = { position: hasNumber ? 'right' : 'left', beginAtZero: true, title: { display: true, text: '百分比' }, ticks: { callback: v => v+'%' } }; }
+
+      trendChart = new Chart(ctx, { type: 'line', data: { labels, datasets }, options: { maintainAspectRatio: false, plugins: { legend: { display: true }, tooltip: { mode: 'index', intersect: false } }, scales } });
+
+      var titleText = (cols.length === 1) ? ths[cols[0]].textContent.trim()+'｜趨勢圖' : cols.length+' 欄疊加｜趨勢圖';
+      document.getElementById('chart-title').textContent = titleText;
+      document.getElementById('chart-note').textContent = '提示：勾選欄位後按「更新圖表」。可下載 PNG / CSV。';
+
+      window.overlayCols = new Set(cols);
+      applyHighlights();
+      openModal();
+    }
+
+    // 匯出：PNG
+    btnPNG.addEventListener('click', ()=>{
+      if (!window.Chart || !trendChart) return;
+      const url = trendChart.toBase64Image();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (document.getElementById('chart-title').textContent.split(' ').join('_') || 'chart') + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+
+    // 匯出：CSV（原始資料）
+    btnCSV.addEventListener('click', ()=>{
+      const cols = selectedColsFromChecklist();
+      if (!cols.length) return;
+      const header = ['日期'].concat(cols.map(ci => ths[ci].textContent.trim()));
+      const rows = [header];
+      allRows.forEach(tr => {
+        const date = tr.children[0]?.textContent?.trim() ?? '';
+        const arr = [date];
+        cols.forEach(ci => {
+          const vText = tr.children[ci]?.textContent?.trim() ?? '';
+          const n = Number(String(vText).replace(/,/g, ''));
+          arr.push(Number.isFinite(n) ? n : '');
+        });
+        rows.push(arr);
+      });
+      const csv = rows.map(r => r.map(function(x){
+        if (typeof x === 'string' && x.indexOf(',') !== -1) { return '"'+ x.replace(/"/g,'""') +'"'; }
+        return x;
+      }).join(',')).join('
+  ');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'chart_data.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // 表頭點擊：快速打開 + 同步勾選
+    function syncChecklistFromOverlay(){
+      checklist.querySelectorAll('input[type="checkbox"]').forEach(el => { el.checked = window.overlayCols && window.overlayCols.has(Number(el.value)); });
+    }
+
+    const skipColChart = new Set([0, 1, lastIndex]);
+    ths.forEach((th, i) => {
+      th.style.cursor = skipColChart.has(i) ? 'default' : 'pointer';
+      if (skipColChart.has(i)) return;
+      th.title = '點擊看趨勢；也可用勾選清單疊加/移除';
+      th.addEventListener('click', () => {
+        window.overlayCols = new Set([i]);
+        buildChecklist();
+        syncChecklistFromOverlay();
+        buildAndShowChart([i]);
+      });
+    });
+
+    /* 底部縱向平均列（Sticky Bottom） */
+      tbody tr.summary-row td {
+        position: sticky;
+        bottom: 0;
+        background: #eef2ff;
+        font-weight: 700;
+        border-top: 2px solid #c7d2fe;
+      }
+      /* 與左/右側 sticky 欄位並存的層級 */
+      tbody tr.summary-row td:first-child { z-index: 30; }
+      tbody tr.summary-row td:last-child  { z-index: 30; }
+
+    // 首次建立清單（不開圖）
+    buildChecklist();
+</script>
+
+{% endblock %}

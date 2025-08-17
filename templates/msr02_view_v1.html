@@ -1,0 +1,381 @@
+{% extends "base.html" %}
+{% block title %}MSR02 Excel 檢視 - {{ super() }}{% endblock %}
+
+{% block content %}
+<style>
+  /* --- 捲軸與桌面樣式（比照參考頁） --- */
+  .table-container::-webkit-scrollbar { width: 8px; height: 8px; }
+  .table-container::-webkit-scrollbar-track { background: #f1f1f1; }
+  .table-container::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+  .table-container::-webkit-scrollbar-thumb:hover { background: #555; }
+
+  /* 版面容器 */
+  .page-wrap { background: #f3f4f6; padding: 1rem; }
+  .container { max-width: 1600px; margin: 0 auto; }
+  .page-title { font-size: 1.75rem; font-weight: 700; color: #1f2937; margin: 0 0 1rem 0; }
+
+  /* 表格外層（高度限制＋可捲動） */
+  .table-container { background: #fff; border-radius: 0.5rem; overflow: auto; box-shadow: 0 1px 10px rgba(0,0,0,.08); max-height: 70vh; }
+
+  /* 表格樣式（貼齊參考頁的緊湊風格） */
+  table.data-table { width: 100%; border-collapse: collapse; color: #4b5563; font-size: 0.9rem; table-layout: fixed; }
+  thead th, tbody td { padding: 0.75rem 1rem; white-space: nowrap; border-bottom: 1px solid #e5e7eb; overflow: hidden; text-overflow: ellipsis; }
+  thead th { position: sticky; top: 0; z-index: 10; background: #e5e7eb; color: #374151; text-transform: uppercase; font-weight: 700; font-size: 0.75rem; }
+  tbody tr:hover td { background: #f9fafb; }
+
+  /* 分頁控制（同參考頁配置與文案） */
+  .pagination { margin-top: 1rem; display: flex; align-items: center; justify-content: center; gap: 0; }
+  .btn { border: 0; cursor: pointer; font-weight: 600; padding: 0.5rem 1rem; }
+  .btn-primary { background: #2563eb; color: #fff; transition: background .15s ease; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn:disabled { background: #9ca3af; cursor: not-allowed; }
+  .btn-left  { border-radius: 0.5rem 0 0 0.5rem; }
+  .btn-right { border-radius: 0 0.5rem 0.5rem 0; }
+  .page-info { font-size: 0.9rem; color: #374151; background: #fff; padding: 0.5rem 1rem; border-top: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; }
+
+  /* --- 凍結第一欄（日期）--- */
+  thead th:first-child,
+  tbody td:first-child { position: sticky; left: 0; background: #fff; background-clip: padding-box; min-width: 110px; white-space: nowrap; }
+  thead th:first-child { top: 0; z-index: 20; background: #e5e7eb; }
+  tbody td:first-child { z-index: 5; box-shadow: 2px 0 0 #e5e7eb; }
+
+  /* === 點擊高亮：螢光黃 === */
+  :root { --hl-yellow: #fff455; }
+  table.data-table tr.hl-row > td { background: var(--hl-yellow) !important; color: #111; }
+  table.data-table th.hl-col, table.data-table td.hl-col { background: var(--hl-yellow) !important; color: #111; }
+  thead th:first-child.hl-col, tbody td:first-child.hl-col { z-index: 25; }
+
+  /* --- 趨勢圖 Modal --- */
+  .chart-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);z-index:1000}
+  .chart-card{background:#fff;width:min(1100px,92vw);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.2);overflow:hidden}
+  .chart-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #e5e7eb}
+  .chart-title{font-weight:700;font-size:1rem}
+  .chart-close{border:0;background:none;cursor:pointer;font-size:20px;line-height:1}
+  .chart-body{padding:12px 16px}
+  .chart-note{color:#6b7280;font-size:.85rem;padding:0 16px 16px}
+  /* 疊加選取欄位高亮（與單欄高亮並存） */
+  table.data-table th.hl-col-ov, table.data-table td.hl-col-ov { background: var(--hl-yellow) !important; color:#111; }
+  thead th:first-child.hl-col-ov, tbody td:first-child.hl-col-ov { z-index: 25; }
+</style>
+
+<div class="page-wrap">
+  <div class="container">
+    <h1 class="page-title">資料呈現（MSR02）</h1>
+
+    {% if error %}
+      <div style="background:#fde2e1;border:1px solid #f9b5b2;color:#7f1d1d;padding:12px 16px;border-radius:8px;margin-bottom:16px;">⚠️ {{ error }}</div>
+    {% else %}
+    {% if records and columns %}
+
+      <!-- 表格容器（70vh，高度可捲動；表頭 sticky） -->
+      <div id="table-wrapper" class="table-container">
+        <table id="data-table" class="data-table">
+          <colgroup id="colgroup"></colgroup>
+          <thead>
+            <tr id="table-header">
+              {% for col in columns %}
+              <th scope="col" title="{{ col }}">{{ col }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody id="table-body">
+            {% for row in records %}
+            <tr>
+              {% for col in columns %}
+              <td title="{{ row[col] }}">{{ row[col] }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 分頁控制（比照參考頁文案與圖示） -->
+      <div class="pagination">
+        <button id="prev-page" class="btn btn-primary btn-left">
+          <svg style="width:14px;height:14px;margin-right:6px" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5H1m0 0l4 4M1 5l4-4"/></svg>
+          上一頁
+        </button>
+        <span id="page-info" class="page-info"></span>
+        <button id="next-page" class="btn btn-primary btn-right">
+          下一頁
+          <svg style="width:14px;height:14px;margin-left:6px" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10"><path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/></svg>
+        </button>
+      </div>
+
+      <div style="text-align:center;margin-top:.5rem;color:#6b7280;font-size:.85rem;">共 {{ total_rows or (records|length) }} 筆資料</div>
+
+    {% else %}
+      <div style="text-align:center;padding:40px;color:#666;">沒有可顯示的資料</div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- 趨勢圖 Modal -->
+<div id="chart-modal" class="chart-modal" aria-hidden="true">
+  <div class="chart-card">
+    <div class="chart-header">
+      <div id="chart-title" class="chart-title">趨勢圖</div>
+      <button id="chart-close" class="chart-close" aria-label="關閉">✕</button>
+    </div>
+    <div class="chart-body">
+      <canvas id="trend-canvas" height="360"></canvas>
+    </div>
+    <div id="chart-note" class="chart-note"></div>
+  </div>
+</div>
+
+<script>
+  // === 分頁參數 ===
+  const rowsPerPage = 31; // 可調整每頁筆數
+  let currentPage = 1;
+
+  // DOM
+  const table      = document.getElementById('data-table');
+  const tableBody  = document.getElementById('table-body');
+  const theadRow   = document.getElementById('table-header');
+  const pageInfo   = document.getElementById('page-info');
+  const prevBtn    = document.getElementById('prev-page');
+  const nextBtn    = document.getElementById('next-page');
+
+  // 儲存原始 <tr>，供換頁用
+  const allRows = Array.from(tableBody.querySelectorAll('tr'));
+  // 給每一列一個全域 rowid（換頁後仍可追蹤）
+  allRows.forEach((tr, i) => tr.dataset.rowid = i);
+
+  // === 高亮狀態（持久化於換頁之後） ===
+  let selectedColIndex = null;  // 被點擊的欄 index（0-based，單格高亮用）
+  let selectedRowId    = null;  // 被點擊列的 dataset.rowid
+  // 疊加圖用的多欄選取集合（表頭 Ctrl/⌘ 點擊新增/移除）
+  window.overlayCols = window.overlayCols || new Set();
+
+  function renderPage() {
+    const totalRows  = allRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalRows / rowsPerPage));
+
+    if (currentPage < 1) currentPage = 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex   = Math.min(startIndex + rowsPerPage, totalRows);
+
+    tableBody.innerHTML = '';
+    for (let i = startIndex; i < endIndex; i++) {
+      tableBody.appendChild(allRows[i].cloneNode(true));
+    }
+
+    // ✅ 套用千分位（只針對非百分比欄）
+    formatNumbersInPage();
+
+    pageInfo.textContent = `第 ${currentPage} 頁 / 共 ${totalPages} 頁`;
+    prevBtn.disabled = currentPage === 1;
+    nextBtn.disabled = currentPage === totalPages;
+
+    applyHighlights(); // 換頁後重貼高亮（含疊加欄位）
+  }
+
+  prevBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); }});
+  nextBtn.addEventListener('click', () => { const totalPages = Math.ceil(allRows.length / rowsPerPage); if (currentPage < totalPages) { currentPage++; renderPage(); }});
+
+  // === 高亮套用/清除 ===
+  function clearHighlightsInCurrentPage() {
+    tableBody.querySelectorAll('tr.hl-row').forEach(tr => tr.classList.remove('hl-row'));
+    theadRow.querySelectorAll('th.hl-col').forEach(th => th.classList.remove('hl-col'));
+    tableBody.querySelectorAll('td.hl-col').forEach(td => td.classList.remove('hl-col'));
+    // 疊加欄位高亮（與單欄高亮分開的 class）
+    theadRow.querySelectorAll('th.hl-col-ov').forEach(th => th.classList.remove('hl-col-ov'));
+    tableBody.querySelectorAll('td.hl-col-ov').forEach(td => td.classList.remove('hl-col-ov'));
+  }
+  function applyHighlights() {
+    clearHighlightsInCurrentPage();
+
+    // 單一選取欄（點資料格時）
+    if (selectedColIndex !== null) {
+      const ths = Array.from(theadRow.children);
+      if (ths[selectedColIndex]) ths[selectedColIndex].classList.add('hl-col');
+      tableBody.querySelectorAll('tr').forEach(tr => {
+        const tds = tr.children;
+        if (tds[selectedColIndex]) tds[selectedColIndex].classList.add('hl-col');
+      });
+    }
+
+    // 疊加圖選取的多欄位
+    if (window.overlayCols && window.overlayCols.size) {
+      const colsArr = Array.from(window.overlayCols);
+      const ths = Array.from(theadRow.children);
+      colsArr.forEach(ci => { if (ths[ci]) ths[ci].classList.add('hl-col-ov'); });
+      tableBody.querySelectorAll('tr').forEach(tr => {
+        const tds = tr.children;
+        colsArr.forEach(ci => { if (tds[ci]) tds[ci].classList.add('hl-col-ov'); });
+      });
+    }
+
+    // 單一選取列
+    if (selectedRowId !== null) {
+      const targetTr = tableBody.querySelector(`tr[data-rowid="${selectedRowId}"]`);
+      if (targetTr) targetTr.classList.add('hl-row');
+    }
+  }
+
+  // === 點擊事件（事件委派）===
+  tableBody.addEventListener('click', (ev) => {
+    const td = ev.target.closest('td');
+    if (!td) return;
+    const tr = td.parentElement;
+    const colIndex = td.cellIndex;        // 0-based
+    const rowId    = tr.dataset.rowid ? Number(tr.dataset.rowid) : null;
+
+    const isSame = (selectedColIndex === colIndex) && (selectedRowId === rowId);
+    if (isSame) { selectedColIndex = null; selectedRowId = null; }
+    else { selectedColIndex = colIndex; selectedRowId = rowId; }
+    applyHighlights();
+  });
+
+  // === 數字格式化設定 ===
+  const isPercentColName = (name) => /[%％]|率/.test(name);
+  const skipCols = new Set([0]); // 例如第 0 欄：日期
+  function shouldFormatThousands(colIndex, text) {
+    if (skipCols.has(colIndex)) return false;
+    const headerCells = Array.from(theadRow.children);
+    const colName = headerCells[colIndex]?.textContent?.trim() || '';
+    if (isPercentColName(colName)) return false;
+    const num = Number(String(text).replace(/[, ]/g, ''));
+    if (!Number.isFinite(num)) return false;
+    return Math.abs(num) >= 1000 || String(text).includes(',');
+  }
+  function toThousands(text) { const num = Number(String(text).replace(/[, ]/g, '')); return Number.isFinite(num) ? num.toLocaleString('en-US') : text; }
+  function formatNumbersInPage() {
+    tableBody.querySelectorAll('tr').forEach(tr => {
+      Array.from(tr.children).forEach((td, i) => {
+        const raw = td.textContent.trim();
+        if (shouldFormatThousands(i, raw)) td.textContent = toThousands(raw);
+      });
+    });
+  }
+
+  // === 依資料內容計算欄寬，套用到 <colgroup> ===
+  function computeAndApplyColWidths() {
+    const colCount = document.getElementById('table-header').children.length;
+    const cg = document.getElementById('colgroup');
+    if (!cg) return;
+
+    const sampleCell = document.querySelector('#table-body td') || document.querySelector('#table-header th');
+    const cs = window.getComputedStyle(sampleCell);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+
+    const maxPx = new Array(colCount).fill(0);
+    allRows.forEach(tr => {
+      Array.from(tr.children).forEach((td, i) => {
+        const txt = td.textContent || '';
+        const w = ctx.measureText(txt).width + padX + 20; // +20 預留些許空間
+        if (w > maxPx[i]) maxPx[i] = w;
+      });
+    });
+
+    const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+    if (maxPx[0] < 110) maxPx[0] = 110; // 日期欄至少 110px
+
+    cg.innerHTML = '';
+    for (let i = 0; i < colCount; i++) {
+      const col = document.createElement('col');
+      col.style.width = `${clamp(Math.ceil(maxPx[i]), 70, 280)}px`; // 可調整 70~280
+      cg.appendChild(col);
+    }
+  }
+
+  // 初次：先算欄寬，再渲染頁面
+  computeAndApplyColWidths();
+  renderPage();
+</script>
+
+<!-- Chart.js（CDN 版；若內網封閉可改放到 /static/js） -->
+<script src="{{ url_for('static', path='js/chart.4.4.3.min.js') }}"></script>
+<script>
+  // === 表頭點擊開趨勢圖（支援 Ctrl/⌘ 疊加） ===
+  const _isPercentColName = (typeof isPercentColName === 'function') ? isPercentColName : (name) => /[%％]|率/.test(name);
+  const ths = Array.from(document.getElementById('table-header').children);
+
+  const modal    = document.getElementById('chart-modal');
+  const closeBtn = document.getElementById('chart-close');
+  function openModal(){ modal.style.display='flex'; }
+  function closeModal(){ modal.style.display='none'; }
+  closeBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+
+  let trendChart = null;
+
+  function buildAndShowChart(cols){
+    if (!cols.length) return;
+
+    // 橫軸使用日期欄（第 0 欄）
+    const labels = [];
+    allRows.forEach(tr => { const d = tr.children[0]?.textContent?.trim() ?? ''; if (d) labels.push(d); });
+
+    const datasets = [];
+    let hasPercent = false, hasNumber = false;
+
+    cols.forEach(ci => {
+      const name = ths[ci].textContent.trim();
+      const isPct = _isPercentColName(name);
+      if (isPct) hasPercent = true; else hasNumber = true;
+
+      const values = [];
+      allRows.forEach(tr => {
+        const vText = tr.children[ci]?.textContent?.trim() ?? '';
+        const n = Number(String(vText).replace(/,/g, ''));
+        values.push(Number.isFinite(n) ? n : null);
+      });
+
+      datasets.push({ label: name, data: values, tension: 0.2, pointRadius: 2, yAxisID: (isPct && hasNumber) ? 'y1' : 'y' });
+    });
+
+    const ctx = document.getElementById('trend-canvas').getContext('2d');
+    if (trendChart) trendChart.destroy();
+
+    const scales = {};
+    if (hasNumber) {
+      scales.y = { title: { display: true, text: '數值' }, ticks: { callback: v => (v?.toLocaleString ? v.toLocaleString() : v) } };
+    }
+    if (hasPercent) {
+      const key = hasNumber ? 'y1' : 'y';
+      scales[key] = { position: hasNumber ? 'right' : 'left', beginAtZero: true, title: { display: true, text: '百分比' }, ticks: { callback: v => `${v}%` } };
+    }
+
+    trendChart = new Chart(ctx, { type: 'line', data: { labels, datasets }, options: { maintainAspectRatio: false, plugins: { legend: { display: true }, tooltip: { mode: 'index', intersect: false } }, scales } });
+
+    document.getElementById('chart-title').textContent = (cols.length === 1) ? `${ths[cols[0]].textContent.trim()}｜趨勢圖` : `${cols.length} 欄疊加｜趨勢圖`;
+    document.getElementById('chart-note').textContent = '提示：單擊表頭＝單一欄；Ctrl/⌘＋點擊＝疊加/取消；點空白處可關閉。';
+
+    // 套用疊加欄位的高亮
+    window.overlayCols = new Set(cols);
+    applyHighlights();
+    openModal();
+  }
+
+  // 不啟用趨勢圖的欄（例如 日期、UNNAMED:1）
+  const skipColChart = new Set([0, 1]);
+  ths.forEach((th, i) => {
+    th.style.cursor = skipColChart.has(i) ? 'default' : 'pointer';
+    if (skipColChart.has(i)) return;
+    th.title = '點擊看趨勢；Ctrl/⌘+點可疊加/取消';
+    th.addEventListener('click', (e) => {
+      if (!window.overlayCols) window.overlayCols = new Set();
+      if (e.ctrlKey || e.metaKey) {
+        // 疊加：切換選取
+        if (window.overlayCols.has(i)) window.overlayCols.delete(i); else window.overlayCols.add(i);
+      } else {
+        // 單一
+        window.overlayCols = new Set([i]);
+      }
+      if (!window.overlayCols.size) window.overlayCols.add(i);
+      buildAndShowChart(Array.from(window.overlayCols));
+    });
+  });
+</script>
+
+{% endblock %}

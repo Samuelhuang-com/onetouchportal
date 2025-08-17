@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CSV 資料表格</title>
+    <!-- 引入 Tailwind CSS 方便快速美化頁面 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* 自訂捲軸樣式，使其在不同瀏覽器上更美觀 */
+      .table-container::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      .table-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+      }
+      .table-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
+      .table-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+      /* 讓表頭在垂直捲動時固定在頂部 */
+      thead th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 font-sans p-4 sm:p-6 lg:p-8">
+    <div class="container mx-auto">
+      <h1 class="text-2xl sm:text-3xl font-bold mb-6 text-gray-800">
+        CSV 資料呈現
+      </h1>
+
+      <!-- 表格容器：設定最大高度與 overflow-auto 來產生捲軸 -->
+      <div
+        id="table-wrapper"
+        class="table-container bg-white rounded-lg shadow-md overflow-auto"
+        style="max-height: 70vh"
+      >
+        <table id="data-table" class="w-full text-sm text-left text-gray-600">
+          <thead class="text-xs text-gray-700 uppercase bg-gray-200">
+            <!-- 表頭將由 JavaScript 動態產生 -->
+            <tr id="table-header"></tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-gray-200">
+            <!-- 表格內容將由 JavaScript 動態產生 -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 分頁控制項 -->
+      <div class="pagination-controls flex items-center justify-center mt-6">
+        <button
+          id="prev-page"
+          class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border-0 rounded-l-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        >
+          <svg
+            class="w-3.5 h-3.5 mr-2"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 14 10"
+          >
+            <path
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M13 5H1m0 0l4 4M1 5l4-4"
+            />
+          </svg>
+          上一頁
+        </button>
+        <span
+          id="page-info"
+          class="text-sm text-gray-700 bg-white px-4 py-2 border-t border-b border-gray-300"
+        ></span>
+        <button
+          id="next-page"
+          class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border-0 rounded-r-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        >
+          下一頁
+          <svg
+            class="w-3.5 h-3.5 ml-2"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 14 10"
+          >
+            <path
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M1 5h12m0 0L9 1m4 4L9 9"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <script>
+      // 使用 DOMContentLoaded 事件確保在操作 DOM 前，頁面已完全載入
+      document.addEventListener("DOMContentLoaded", function () {
+        // --- 資料區 ---
+        // 將 Python 處理好的 CSV 資料轉換成 JSON 格式嵌入，這是最安全可靠的方式
+        const tableHeaderData = [
+          "日期",
+          "",
+          "星期",
+          "住房率總房數",
+          "住房率可售房",
+          "平均房價總住房數",
+          "平均房價售房合計",
+          "可售總金額",
+          "總房租",
+          "總房間數",
+          "OOO",
+          "MBK",
+          "HUS",
+          "COMP",
+          "可售房數",
+          "售房合計",
+          "總住房數",
+          "FIT",
+          "GIT",
+          "人數",
+          "不佔床人數",
+          "AS\n(3)",
+          "SS\n(40)",
+          "ST\n(34)",
+          "DS\n(31)",
+          "DH\n(14)",
+          "DT\n(41)",
+          "ES\n(14)",
+          "EH\n(46)",
+          "JS\n(2)",
+          "US\n(6)",
+          "IS\n(1)",
+        ];
+        const tableData = [
+          [
+            "20250801",
+            "",
+            "五",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250802",
+            "",
+            "六",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250803",
+            "",
+            "日",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250804",
+            "",
+            "一",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250805",
+            "",
+            "二",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250806",
+            "",
+            "三",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250807",
+            "",
+            "四",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250808",
+            "",
+            "五",
+            "14.22",
+            "15.43",
+            "3580",
+            "3580",
+            "91782",
+            "91782",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "33",
+            "33",
+            "33",
+            "0",
+            "50",
+            "1",
+            "0",
+            "8",
+            "6",
+            "5",
+            "2",
+            "11",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250809",
+            "",
+            "六",
+            "26.29",
+            "28.52",
+            "3833",
+            "3833",
+            "233833",
+            "233833",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "61",
+            "61",
+            "61",
+            "0",
+            "104",
+            "1",
+            "0",
+            "15",
+            "10",
+            "10",
+            "2",
+            "19",
+            "2",
+            "3",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250810",
+            "",
+            "日",
+            "14.66",
+            "15.89",
+            "3521",
+            "3521",
+            "121481",
+            "121481",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "34",
+            "34",
+            "34",
+            "0",
+            "57",
+            "1",
+            "0",
+            "10",
+            "4",
+            "7",
+            "2",
+            "10",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250811",
+            "*",
+            "一",
+            "17.67",
+            "19.16",
+            "3543",
+            "3543",
+            "138183",
+            "138183",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "41",
+            "41",
+            "41",
+            "0",
+            "64",
+            "1",
+            "0",
+            "10",
+            "7",
+            "7",
+            "2",
+            "13",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250812",
+            "*",
+            "二",
+            "16.38",
+            "17.76",
+            "3614",
+            "3614",
+            "129183",
+            "129183",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "38",
+            "38",
+            "38",
+            "0",
+            "65",
+            "1",
+            "0",
+            "11",
+            "5",
+            "7",
+            "2",
+            "11",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250813",
+            "*",
+            "三",
+            "14.22",
+            "15.43",
+            "3580",
+            "3580",
+            "118147",
+            "118147",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "33",
+            "33",
+            "33",
+            "0",
+            "54",
+            "1",
+            "0",
+            "9",
+            "5",
+            "6",
+            "2",
+            "10",
+            "1",
+            "0",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250814",
+            "*",
+            "四",
+            "19.83",
+            "21.5",
+            "3610",
+            "3610",
+            "166047",
+            "166047",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "46",
+            "46",
+            "46",
+            "0",
+            "72",
+            "1",
+            "0",
+            "13",
+            "8",
+            "7",
+            "2",
+            "14",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250815",
+            "*",
+            "五",
+            "23.28",
+            "25.24",
+            "3711",
+            "3711",
+            "200382",
+            "200382",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "54",
+            "54",
+            "54",
+            "0",
+            "91",
+            "1",
+            "0",
+            "14",
+            "9",
+            "8",
+            "2",
+            "18",
+            "2",
+            "1",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250816",
+            "*",
+            "六",
+            "33.62",
+            "36.46",
+            "3886",
+            "3886",
+            "303132",
+            "303132",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "78",
+            "78",
+            "78",
+            "0",
+            "137",
+            "1",
+            "0",
+            "19",
+            "14",
+            "12",
+            "2",
+            "26",
+            "2",
+            "3",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250817",
+            "*",
+            "日",
+            "18.97",
+            "20.57",
+            "3645",
+            "3645",
+            "152161",
+            "152161",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "44",
+            "44",
+            "44",
+            "0",
+            "78",
+            "1",
+            "0",
+            "14",
+            "8",
+            "7",
+            "2",
+            "10",
+            "2",
+            "1",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250818",
+            "*",
+            "一",
+            "20.69",
+            "22.43",
+            "3595",
+            "3595",
+            "172576",
+            "172576",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "48",
+            "48",
+            "48",
+            "0",
+            "80",
+            "1",
+            "0",
+            "9",
+            "2",
+            "10",
+            "2",
+            "23",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250819",
+            "*",
+            "二",
+            "12.07",
+            "13.08",
+            "3151",
+            "3151",
+            "88239",
+            "88239",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "28",
+            "28",
+            "28",
+            "0",
+            "42",
+            "0",
+            "0",
+            "9",
+            "7",
+            "6",
+            "2",
+            "2",
+            "1",
+            "1",
+            "0",
+            "0",
+            "0",
+          ],
+          [
+            "20250820",
+            "*",
+            "三",
+            "9.48",
+            "10.28",
+            "3176",
+            "3176",
+            "69878",
+            "69878",
+            "232",
+            "18",
+            "0",
+            "0",
+            "0",
+            "214",
+            "22",
+            "22",
+            "22",
+            "0",
+            "30",
+            "1",
+            "0",
+            "8",
+            "2",
+            "6",
+            "2",
+            "3",
+            "0",
+            "1",
+            "0",
+            "0",
+            "0",
+          ],
+        ];
+
+        // --- 設定與變數 ---
+        const rowsPerPage = 20; // 您可以更改此數字來調整每頁顯示的行數
+        let currentPage = 1;
+
+        // --- DOM 元素 ---
+        const tableBody = document.getElementById("table-body");
+        const tableHeadRow = document.getElementById("table-header");
+        const pageInfo = document.getElementById("page-info");
+        const prevButton = document.getElementById("prev-page");
+        const nextButton = document.getElementById("next-page");
+
+        /**
+         * 根據目前頁數，渲染表格內容
+         */
+        function displayTable() {
+          // 清空舊的內容
+          tableBody.innerHTML = "";
+          tableHeadRow.innerHTML = "";
+
+          // 產生表頭
+          tableHeaderData.forEach((headerText) => {
+            const th = document.createElement("th");
+            th.scope = "col";
+            th.className = "px-6 py-3 whitespace-nowrap"; // whitespace-nowrap 確保表頭文字不換行
+            th.textContent = headerText.replace(/\\n/g, " "); // 將 \n 換成空格
+            tableHeadRow.appendChild(th);
+          });
+
+          // 計算當前頁面應該顯示的資料範圍
+          const startIndex = (currentPage - 1) * rowsPerPage;
+          const endIndex = startIndex + rowsPerPage;
+          const paginatedData = tableData.slice(startIndex, endIndex);
+
+          // 產生表格內容
+          paginatedData.forEach((rowData) => {
+            const row = document.createElement("tr");
+            row.className = "bg-white hover:bg-gray-50 transition-colors";
+            rowData.forEach((cellData) => {
+              const cell = document.createElement("td");
+              cell.className = "px-6 py-4 whitespace-nowrap";
+              cell.textContent = cellData;
+              row.appendChild(cell);
+            });
+            tableBody.appendChild(row);
+          });
+
+          updatePagination();
+        }
+
+        /**
+         * 更新分頁控制項的狀態 (頁數資訊、按鈕啟用/禁用)
+         */
+        function updatePagination() {
+          const totalPages = Math.ceil(tableData.length / rowsPerPage);
+          pageInfo.textContent = `第 ${currentPage} 頁 / 共 ${totalPages} 頁`;
+
+          // 根據目前頁數決定是否禁用按鈕
+          prevButton.disabled = currentPage === 1;
+          nextButton.disabled = currentPage === totalPages;
+        }
+
+        // --- 事件監聽 ---
+        prevButton.addEventListener("click", () => {
+          if (currentPage > 1) {
+            currentPage--;
+            displayTable();
+          }
+        });
+
+        nextButton.addEventListener("click", () => {
+          const totalPages = Math.ceil(tableData.length / rowsPerPage);
+          if (currentPage < totalPages) {
+            currentPage++;
+            displayTable();
+          }
+        });
+
+        // --- 初始載入 ---
+        // 頁面載入後，第一次顯示表格
+        displayTable();
+      });
+    </script>
+  </body>
+</html>
