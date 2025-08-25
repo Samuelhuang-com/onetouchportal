@@ -1,0 +1,462 @@
+/* static/style.css (cleaned & deduped) */
+
+/* 1) Variables & Base */
+:root{
+  --bg:#f4f7f9; --text:#333; --muted:#6c757d;
+  --primary:#3498db; --primary-strong:#2980b9;
+  --sidebar-bg:#2c3e50; --sidebar-hover:#34495e; --sidebar-active:#2980b9; --sidebar-border:#34495e;
+  --card-bg:#fff; --border:#e0e0e0;
+  --sidebar-w:200px; --sidebar-collapsed-w:72px; /* 調這裡就能改寬度 */
+}
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  font-family:'Noto Sans TC','Helvetica Neue',Arial,sans-serif;
+  margin:0; color:var(--text); background:var(--bg);
+  display:flex; overflow:hidden;
+}
+
+/* 2) Layout */
+.app-container{ display:flex; width:100%; height:100%; }
+.main-content{
+  flex:1 1 auto; display:flex; flex-direction:column; height:100%;
+  transition: margin-left .3s ease-in-out;
+}
+.page-content{
+  flex:1 1 auto; padding:12px 16px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:8px;
+}
+
+/* 3) Header */
+.header{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:12px 24px; background:#fff; border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.header .logo{ height:32px; margin-right:12px; }
+.header-user-info{ font-size:.9em; color:#495057; }
+
+/* 4) Sidebar */
+.sidebar{
+  background:var(--sidebar-bg); color:#ecf0f1;
+  width:var(--sidebar-w); min-width:var(--sidebar-w);
+  display:flex; flex-direction:column; flex-shrink:0;
+  transition: width .3s ease-in-out;
+}
+.sidebar-brand{
+  padding:20px; border-bottom:1px solid var(--sidebar-border);
+  display:flex; align-items:center; gap:8px;
+}
+.sidebar-brand .logo{ height:32px; }
+
+/* Link list */
+.sidebar-links{ list-style:none; margin:10px 0; padding:0; }
+.sidebar-links li a{
+  display:flex; align-items:center; gap:12px;
+  padding:14px 20px; color:#ced4da; text-decoration:none;
+  transition:background-color .2s,color .2s;
+  border-left:4px solid transparent;
+}
+.sidebar-links li a .icon{ width:24px; text-align:center; font-size:1.1em; }
+.sidebar-links li a:hover{ background:var(--sidebar-hover); color:#fff; }
+.sidebar-links li a.active{
+  background:var(--sidebar-active); color:#fff; font-weight:500; border-left-color:#80bdff;
+}
+
+/* Footer links */
+.sidebar-footer{ margin-top:auto; padding:10px; border-top:1px solid var(--sidebar-border); }
+.sidebar-footer a{
+  display:flex; align-items:center; gap:12px; padding:12px 20px;
+  color:#ced4da; text-decoration:none; border-radius:4px;
+  transition:background-color .2s,color .2s;
+}
+.sidebar-footer a:hover{ background:var(--sidebar-hover); color:#fff; }
+
+/* 5) Accordion (一開其他關) — 配合 base.html 的 JS */
+.has-submenu > a{ display:flex; align-items:center; }
+.has-submenu > a .arrow{
+  margin-left:auto; width:0; height:0;
+  border-left:5px solid currentColor; border-top:5px solid transparent; border-bottom:5px solid transparent;
+  transition:transform .2s ease;
+}
+.has-submenu.open > a .arrow{ transform:rotate(90deg); }
+
+/* 子選單容器：max-height 動畫 */
+.submenu{
+  list-style:none; margin:0; padding:0; overflow:hidden;
+  max-height:0; background:rgba(0,0,0,.2);
+  transition:max-height .22s ease-in-out; position:relative;
+}
+/* 左側導引線（想更素淨可刪） */
+.submenu::before{
+  content:''; position:absolute; top:0; left:28px; width:1px; height:100%;
+  background:rgba(255,255,255,.15);
+}
+.has-submenu.open > .submenu{ max-height:800px; padding:6px 0; }
+
+.submenu a{
+  position:relative; /* 給前導短線定位 */
+  padding:10px 20px 10px 48px; color:#ced4da; text-decoration:none;
+}
+.submenu a:hover{ background:rgba(255,255,255,.1); }
+.submenu a.active{ background:var(--primary); color:#fff; font-weight:500; }
+/* 子選單前導短線 */
+.submenu a::before{
+  content:''; position:absolute; top:50%; left:28px; transform:translateY(-50%);
+  width:12px; height:1px; background:rgba(255,255,255,.25);
+}
+.submenu a:hover::before,.submenu a.active::before{ background:#fff; }
+
+/* 單行省略號（避免折行） */
+.link-name{ flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* 6) Collapsed */
+.app-container.sidebar-collapsed .sidebar{ width:var(--sidebar-collapsed-w); min-width:var(--sidebar-collapsed-w); }
+.app-container.sidebar-collapsed .sidebar .link-name,
+.app-container.sidebar-collapsed .sidebar .arrow{ display:none; }
+.app-container.sidebar-collapsed .sidebar-links li a,
+.app-container.sidebar-collapsed .sidebar-footer a{ justify-content:center; }
+.app-container.sidebar-collapsed .submenu{ display:none !important; max-height:0 !important; }
+.app-container.sidebar-collapsed .submenu::before,
+.app-container.sidebar-collapsed .submenu a::before{ display:none; }
+/* 收合按鈕旋轉（可選） */
+#sidebar-toggle .toggle-icon{ transition:transform .3s; }
+.app-container.sidebar-collapsed #sidebar-toggle .toggle-icon{ transform:rotate(180deg); }
+
+/* 7) Common UI */
+.button,button{
+  background:var(--primary); color:#fff; padding:10px 15px;
+  border:none; border-radius:5px; cursor:pointer; font-size:1em;
+}
+.button:hover,button:hover{ background:var(--primary-strong); }
+
+/* Tables */
+table{ width:100%; border-collapse:collapse; margin-top:16px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+th,td{ padding:12px 15px; text-align:left; border-bottom:1px solid #ddd; }
+thead tr{ background:#f2f2f2; }
+tbody tr:hover{ background:#f5f5f5; }
+
+/* Cards */
+.card{ background:#fff; padding:1rem; border-radius:8px; }
+
+/* Power BI / Iframe 容器 */
+.iframe-container,.powerbi-container{
+  flex:1 1 auto; border:1px solid var(--border); border-radius:4px; overflow:hidden;
+}
+.iframe-container iframe,.powerbi-container iframe{ width:100%; height:100%; border:0; }
+
+/* 搜尋區塊 */
+.search-container{ background:#fff; padding:24px; margin-bottom:24px; border-radius:8px; border:1px solid var(--border); box-shadow:0 2px 4px rgba(0,0,0,.05); }
+.search-form{ display:flex; gap:10px; }
+.search-form input[type="text"]{ flex:1 1 auto; padding:12px; border:1px solid #ced4da; border-radius:4px; font-size:1rem; }
+
+/* File list */
+.file-list ul{ list-style:none; padding:0; }
+.file-list li{ background:#fff; border:1px solid #e9ecef; border-radius:5px; margin-bottom:8px; transition:box-shadow .2s; }
+.file-list li:hover{ box-shadow:0 2px 5px rgba(0,0,0,.1); }
+.file-list li a{ display:flex; align-items:center; padding:15px; color:#343a40; font-weight:500; text-decoration:none; }
+.file-list li a .icon{ margin-right:12px; font-size:1.2em; color:var(--primary); }
+
+/* Alerts */
+.alert.alert-danger{
+  color:#721c24; background:#f8d7da; border-color:#f5c6cb;
+  padding:15px; border:1px solid transparent; border-radius:4px;
+}
+
+/* Quill 內容盒（緊湊） */
+.content-box{
+  border:1px solid #ddd; border-radius:8px; padding:6px; background:#fff;
+  box-shadow:0 2px 6px rgba(0,0,0,.12); margin-top:6px;
+}
+.content-box .ql-snow{ padding:0; border:0; background:transparent; }
+.content-box .ql-editor{ padding:0; min-height:unset; line-height:1.5; }
+.content-box .ql-editor p{ margin:.4em 0; }
+.content-box .ql-editor>*:first-child{ margin-top:0; }
+.content-box .ql-editor>*:last-child{ margin-bottom:0; }
+
+/* 8) Responsive & a11y */
+@media (max-width:1280px){ :root{ --sidebar-w:232px; } }
+@media (max-width:1024px){ :root{ --sidebar-w:220px; } }
+@media (prefers-reduced-motion:reduce){
+  .submenu, .has-submenu > a .arrow, #sidebar-toggle .toggle-icon{ transition:none; }
+}
+
+/* === Submenu spacing override (避免文字貼線) === */
+:root{
+  /* 導引線距離左邊 */
+  --submenu-line-x: 22px;
+  /* 每一列的短橫線位置（通常在導引線右邊一點） */
+  --submenu-dash-x: 32px;
+  /* 文字起始縮排（增大 = 文字離線更遠） */
+  --submenu-text-pl: 56px;
+}
+
+/* 導引線（整段子選單左側的直線） */
+.sidebar .submenu::before{
+  left: var(--submenu-line-x) !important;
+}
+
+/* 每列的短橫線 ─ */
+.sidebar .submenu a::before{
+  left: var(--submenu-dash-x) !important;
+}
+
+/* 文字縮排（決定文字與線的距離） */
+.sidebar .submenu a{
+  padding-left: var(--submenu-text-pl) !important;
+}
+/* === 按鈕型連結：取消底線、對齊圖示 === */
+a.button, .button,
+a.btn, .btn {
+  text-decoration: none !important;   /* 拿掉底線 */
+  display: inline-flex;               /* 讓圖示與文字水平置中 */
+  align-items: center;
+  gap: 8px;                           /* 圖示與文字間距 */
+}
+
+a.button:hover, .button:hover,
+a.btn:hover, .btn:hover {
+  text-decoration: none !important;   /* hover 也不加底線 */
+}
+
+/* 如果你曾用 border-bottom 當作「底線」效果，這裡也一起關掉 */
+a.button, .button, a.btn, .btn { border-bottom: 0 !important; }
+
+/* === 固定底部，清單可捲動 === */
+
+/* 側欄本身固定在視窗高度內，不隨內容變高 */
+.sidebar{
+  height: 100vh;          /* 佔滿可視高度 */
+  overflow: hidden;       /* 不讓整個側欄一起捲 */
+  display: flex;
+  flex-direction: column;
+}
+
+/* 頂部區塊(品牌+清單容器)要能把空間讓出給中段清單 */
+.sidebar-top-content{
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;          /* 這行是關鍵，沒有會撐爆導致 footer 被擠走 */
+}
+
+/* 只讓中段清單區捲動，footer 就能固定在底部 */
+.sidebar-scrollable-content{
+  flex: 1 1 auto;
+  min-height: 0;          /* 讓 overflow 生效的關鍵 */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* 底部固定：不縮小、不捲動 */
+.sidebar-footer{
+  flex-shrink: 0;
+  position: sticky;       /* 可選：保險用 */
+  bottom: 0;
+  background: var(--sidebar-bg);
+  border-top: 1px solid var(--sidebar-border);
+}
+
+/* 收合狀態一樣適用（可視需要保留/調整） */
+.app-container.sidebar-collapsed .sidebar{
+  height: 100vh;
+  overflow: hidden;
+}
+.app-container.sidebar-collapsed .sidebar-scrollable-content{
+  overflow-y: auto;
+}
+
+/* (可選) 捲軸樣式，讓清單比較好看 */
+.sidebar-scrollable-content::-webkit-scrollbar{ width: 8px; }
+.sidebar-scrollable-content::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,.25);
+  border-radius: 4px;
+}
+.sidebar-scrollable-content:hover::-webkit-scrollbar-thumb{
+  background: rgba(255,255,255,.35);
+}
+
+/* === Logo：同一張圖，依情境定高 === */
+/* === [LOGO & BRAND OVERRIDES] 置於 style.css 最末端 === */
+
+/* 統一 Logo 尺寸策略：只定高度、寬度自動，避免拉伸 */
+:root{
+  --logo-h-sidebar: 38px;   /* 側欄品牌 Logo 高度 */
+  --logo-h-login:   56px;   /* 登入卡片 Logo 高度 */
+}
+
+/* 所有 .logo 僅定高；寬自動 */
+.logo{
+  display:block;
+  height:auto;
+  max-width:100%;
+  object-fit: contain;   /* 不裁切、不變形 */
+}
+
+/* 側欄品牌區 */
+.sidebar-brand{
+  padding:20px;
+  border-bottom:1px solid var(--sidebar-border);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  text-align:center;
+}
+.sidebar-brand .brand-logo{
+  height: var(--logo-h-sidebar);
+  width: auto;
+  margin: 4px auto 2px;
+}
+.sidebar-brand .portal-name{
+  /* 不要被 .link-name 的單行省略規則影響 */
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+
+  display:block;
+  color:#fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+
+/* 登入頁品牌區（置中、等比例） */
+.brand-wordmark{
+  text-align:center;
+  margin: 2px 0 10px;
+}
+.brand-wordmark .login-logo{
+  height: var(--logo-h-login);
+  width: auto;
+  margin: 0 auto 6px;
+}
+.brand-wordmark .zh-hotel{
+  font-size: 16px;
+  color: #6b7280;
+  letter-spacing: 6px;
+}
+
+/* 保留清單項目的單行省略，但不影響側欄品牌文字 */
+.sidebar .link-name{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-brand .link-name,
+.sidebar-brand .portal-name{ white-space: normal; overflow: visible; text-overflow: initial; }
+
+/* 若你曾經用過 ::after 箭頭，現在品牌用的是 <img> + 文字，不影響；不用改箭頭樣式 */
+
+/* ---------- Python.org 風格搜尋框 ---------- */
+:root{
+  /* 可依喜好微調色彩與圓角 */
+  --py-card-bg:#233648;           /* 深藍卡片底 */
+  --py-card-bd:#1e2d3b;           /* 邊框 */
+  --py-card-glow: rgba(0,0,0,.25);
+  --py-input-bg:#fff; --py-input-bd:#d6dbe0;
+  --py-input-ph:#9aa6b2;
+  --py-btn-grad-1:#5fa3e2;        /* GO 漸層上 */
+  --py-btn-grad-2:#2f6fb6;        /* GO 漸層下 */
+  --py-btn-bd:#245f9c;
+  --py-btn-hover-1:#6db0ee;
+  --py-btn-hover-2:#3b7dca;
+  --py-btn-active-1:#2f6fb6;
+  --py-btn-active-2:#255c98;
+  --py-radius:10px;               /* 外框圓角 */
+}
+
+/* 容器卡片（深色、圓角、投影） */
+.pysearch{
+  background: var(--py-card-bg);
+  border: 1px solid var(--py-card-bd);
+  border-radius: var(--py-radius);
+  box-shadow: 0 8px 18px var(--py-card-glow);
+  padding: 10px;
+  display: inline-block;          /* 讓它像元件一樣可放在任何地方 */
+}
+
+/* 內部排列：左(搜尋) | 右(分頁) */
+.pysearch-form{
+  display:flex; align-items:stretch; gap:0;
+  overflow:hidden; border-radius: calc(var(--py-radius) - 2px);
+}
+
+/* 放大鏡：深色圓角底 + 內陰影，貼齊輸入框左側 */
+.pysearch-icon{
+  display:flex; align-items:center; justify-content:center;
+  padding: 0 10px; background: rgba(0,0,0,.25);
+  border-right: 1px solid rgba(255,255,255,.06);
+}
+
+/* 輸入框 */
+.pysearch input[type="search"]{
+  width: 320px;
+  max-width: 44vw;
+  background: var(--py-input-bg);
+  border: 1px solid var(--py-input-bd);
+  border-right: 0;
+  border-radius: 6px 0 0 6px;
+  padding: 10px 12px;
+  font-size: 15px;
+  outline: none;
+  transition: box-shadow .18s, border-color .18s;
+}
+.pysearch input::placeholder{ color: var(--py-input-ph); }
+.pysearch input:focus{
+  border-color: #7aa7d9;
+  box-shadow: 0 0 0 3px rgba(94,149,214,.25);
+}
+
+/* GO 按鈕：漸層、內外陰影、圓角、動態 */
+.pysearch-go{
+  cursor:pointer; user-select:none;
+  padding: 0 14px;
+  min-width: 56px;
+  font-weight: 700; letter-spacing:.5px;
+  color:#fff; border:1px solid var(--py-btn-bd);
+  background-image: linear-gradient(to bottom, var(--py-btn-grad-1), var(--py-btn-grad-2));
+  border-radius: 0 6px 6px 0;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.25),
+    0 2px 6px rgba(0,0,0,.25);
+  transition: transform .06s ease, filter .12s, background .18s, box-shadow .18s;
+}
+.pysearch-go:hover{
+  background-image: linear-gradient(to bottom, var(--py-btn-hover-1), var(--py-btn-hover-2));
+  filter: brightness(1.02);
+}
+.pysearch-go:active{
+  transform: translateY(1px);
+  background-image: linear-gradient(to bottom, var(--py-btn-active-1), var(--py-btn-active-2));
+  box-shadow:
+    inset 0 1px 2px rgba(0,0,0,.35),
+    0 1px 3px rgba(0,0,0,.18);
+}
+.pysearch-go:focus-visible{
+  outline: 3px solid rgba(109,176,238,.35);
+  outline-offset: 2px;
+}
+
+/* 右側分頁標籤：像 python.org 的 Socialize 區塊 */
+.pysearch-tab{
+  display:flex; align-items:center; padding: 0 18px;
+  color:#e2e8f0; text-decoration:none;
+  background: rgba(0,0,0,.25);
+  border-left: 1px solid rgba(0,0,0,.35);
+  border-right: 1px solid rgba(255,255,255,.08);
+}
+.pysearch-tab:hover{ background: rgba(0,0,0,.32); color:#fff; }
+
+/* 小螢幕自動縮短 */
+@media (max-width: 768px){
+  .pysearch input[type="search"]{ width: 220px; }
+}
+@media (max-width: 480px){
+  .pysearch{ width:100%; padding:8px; }
+  .pysearch-form{ border-radius: 8px; }
+  .pysearch input[type="search"]{ width:100%; max-width:none; }
+  .pysearch-tab{ display:none; }   /* 手機上可隱藏右側分頁 */
+}
+
+/* 無障礙：隱藏但可被讀屏器讀到的 label */
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}

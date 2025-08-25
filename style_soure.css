@@ -1,0 +1,168 @@
+/* static/style.css */
+
+/* --- 基本與重設 --- */
+html, body {
+    font-family: 'Noto Sans TC', 'Helvetica Neue', Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9fa;
+    color: #212529;
+    height: 100%;
+    overflow: hidden;
+}
+
+h2, h3 {
+    color: #343a40;
+    font-weight: 700;
+}
+
+a {
+    color: #007bff;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+/* --- 整體佈局 --- */
+.app-container {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.main-content {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.page-content {
+    flex-grow: 1;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+
+/* --- 頁首 Header --- */
+.header {
+    display: flex;
+    justify-content: flex-end; /* 將內容推到最右邊 */
+    align-items: center;
+    padding: 12px 24px;
+    background-color: #ffffff;
+    border-bottom: 1px solid #dee2e6;
+    flex-shrink: 0;
+    min-height: 57px; /* 保持原有的高度感 */
+    box-sizing: border-box;
+}
+
+.header-user-info {
+    font-size: 0.9em;
+    color: #495057;
+}
+
+
+/* --- 側邊導覽列 Sidebar --- */
+.sidebar {
+    width: 240px;
+    background-color: #343a40;
+    color: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    flex-shrink: 0;
+    height: 100vh;
+}
+
+/* 頂部品牌區塊樣式 (靠左對齊) */
+.sidebar-brand {
+    padding: 20px;
+    display: flex;
+    flex-direction: row; /* 水平排列 */
+    align-items: center;   /* 垂直置中 */
+    border-bottom: 1px solid #495057;
+    flex-shrink: 0;
+}
+
+.sidebar-brand .logo {
+    height: 32px;
+    margin-bottom: 0;
+    margin-right: 12px; /* Logo 和文字的間距 */
+}
+
+.sidebar-brand strong {
+    color: #ffffff;
+    font-size: 1.1em;
+    font-weight: 700;
+}
+
+/* 中間可滾動內容區塊 */
+.sidebar-scrollable-content {
+    overflow-y: auto;
+}
+
+.sidebar-links {
+    list-style-type: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.sidebar-links li a {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    color: #ced4da;
+    transition: background-color 0.2s, color 0.2s;
+    border-left: 4px solid transparent;
+}
+
+.sidebar-links li a:hover {
+    background-color: #495057;
+    color: #ffffff;
+    text-decoration: none;
+}
+
+.sidebar-links li a.active {
+    background-color: #007bff;
+    color: #ffffff;
+    font-weight: 500;
+    border-left-color: #80bdff;
+}
+
+.sidebar-links li a .icon {
+    margin-right: 15px;
+    font-size: 1.1em;
+    width: 24px;
+    text-align: center;
+}
+
+/* 側邊欄底部的樣式 */
+.sidebar-footer {
+    padding: 10px;
+    border-top: 1px solid #495057;
+    flex-shrink: 0;
+}
+
+.sidebar-footer a {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    color: #ced4da;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
+}
+
+.sidebar-footer a:hover {
+    color: #ffffff;
+    background-color: #495057;
+    text-decoration: none;
+}
+
+.sidebar-footer a .icon {
+    margin-right: 15px;
+    font-size: 1.1em;
+}
