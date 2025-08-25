@@ -7,46 +7,50 @@ import json
 import locale
 
 # --- 檔案路徑常數 ---
+# app_utils.py（新增）
+AUTH_DB = "data/auth.db"  # 未來以此為主；PERMISSION_FILE 僅供相容期過渡
+
 DAILY_LOG_FILE = "data/daily_log.xlsx"
 CONTRACTS_FILE = "data/contracts.xlsx"
 CONTRACT_ATTACHMENT_DIR = "data/ContractFile"
 PERMISSION_FILE = "data/Permissioncontrol.xlsx"
 ANNOUNCEMENTS_FILE = "data/announcements.json"
 BUDGETS_FILE = "data/budgets.json"
-# --- 模板引擎設定 (包含百分比過濾器) ---
+
+# --- 模板引擎設定 (包含百分比/數字過濾器) ---
 
 
 def percent_filter(value):
     """將數字轉換為百分比格式的字串，例如 0.95 -> '95.00%'"""
     try:
-        # 嘗試將傳入的值格式化為帶兩位小數的百分比
         return "{:.2%}".format(float(value))
     except (ValueError, TypeError):
-        # 如果值無法轉換 (例如是 None 或空字串)，則直接返回原值
         return value
 
 
 def number_format_filter(value):
     """將數字加上千分位符號"""
     try:
-        # 使用 locale 來做本地化的數字格式化
         locale.setlocale(locale.LC_ALL, "")
         return locale.format_string("%d", int(value), grouping=True)
     except (ValueError, TypeError):
         return value
 
 
-# 建立 Jinja2 模板實例
 templates = Jinja2Templates(directory="templates")
-
-# ★ 核心修正：將自訂的 percent_filter 函式註冊到模板環境中
-# 這樣在 HTML 裡才能使用 {{ my_number | percent }}
 templates.env.filters["percent"] = percent_filter
 templates.env.filters["number"] = number_format_filter
 
 # --- 導覽列項目定義 ---
 NAV_ITEMS = [
     {"name": "主控台", "url": "/dashboard", "icon": "🏠"},
+    # 在「資料管理」或新增一個群組下加入
+    {
+        "name": "簽核系統",
+        "url": "/approvals","icon": "📋",
+        "permission_key": "approvals",
+    },
+
     {"name": "行銷活動", "url": "/events", "icon": "📅", "permission_key": "events"},
     {
         "name": "訂位總覽",
@@ -71,6 +75,18 @@ NAV_ITEMS = [
                 "url": "/budgets/manage",
                 "permission_key": "manage_budget",
             },
+            # ✅ 新增：將 Excel 分析（MSR02）移入「營運報表」底下
+            {
+                "name": "Excel 分析（MSR02）",
+                "url": "/rv",  # 對應 routers/rv_analysis_router.py 的 /rv 頁面
+                "permission_key": "report",  # 沿用 report 權限
+            },
+            # app_utils.py → NAV_ITEMS 的「營運報表」區段 sub_items 中追加一筆
+            {
+                "name": "Excel 檢視（MSR02 原檔）",
+                "url": "/msr02",
+                "permission_key": "report",
+            },
         ],
     },
     {
@@ -89,7 +105,18 @@ NAV_ITEMS = [
             {"name": "修改密碼", "url": "/user/change-password", "icon": "🔑"},
         ],
     },
-    # --- 新增的內部知識庫項目 ---
+    {
+        "name": "客服中心",
+        "icon": "☎️",
+        "sub_items": [
+            {
+                "name": "總機客服登記",
+                "url": "/callcenter",
+                "permission_key": "callcenter",
+            }
+        ],
+    },
+    # --- 內部知識庫 ---
     {
         "name": "內部知識庫",
         "icon": "📚",
@@ -121,7 +148,7 @@ NAV_ITEMS = [
             },
         ],
     },
-    # ===== 新增洗衣管理子選單 =====
+    # --- 洗衣管理 ---
     {
         "name": "洗衣管理",
         "icon": "👕",
@@ -130,7 +157,7 @@ NAV_ITEMS = [
             {"name": "洗衣統計報表", "url": "/laundry/report"},
         ],
     },
-    {"name": "Excel 分析（MSR02）", "url": "analysis", "permission_key": "report"},
+    # ⚠️ 原本在最外層的「Excel 分析（MSR02）」已移除（避免重複）
     {"name": "功能總覽", "url": "/home", "icon": "🧭"},
 ]
 
@@ -145,7 +172,7 @@ def get_visible_nav_items(role: str, permissions: Dict[str, bool]) -> List[Dict]
             visible_sub_items = []
             for sub_item in item["sub_items"]:
                 key = sub_item.get("permission_key")
-                if role == "admin" or permissions.get(key, False):
+                if role == "admin" or permissions.get(key, False) or key is None:
                     visible_sub_items.append(sub_item)
             if visible_sub_items:
                 new_item = item.copy()
@@ -153,7 +180,6 @@ def get_visible_nav_items(role: str, permissions: Dict[str, bool]) -> List[Dict]
                 visible_items.append(new_item)
         else:
             key = item.get("permission_key")
-            # 如果沒有權限鍵，則所有登入用戶都可見
             if not key or role == "admin" or permissions.get(key, False):
                 visible_items.append(item)
     return visible_items
@@ -179,7 +205,7 @@ def get_base_context(
     return {
         "request": request,
         "nav_items": visible_nav,
-        "current_path": request.url.path,
+        "current_path": request.url.path,  # base.html 可用於判斷 active
         "user": user,
         "role": role,
         "permissions": permissions,

@@ -1,0 +1,540 @@
+{% extends "base.html" %} {% block title %}總機客服登記 - {{ super() if super
+else 'OneTouch' }}{% endblock %} {% block content %}
+<style>
+  :root {
+    --bg: #f3f4f6;
+    --card: #fff;
+    --text: #111827;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --bd: #e5e7eb;
+    --ok: #16a34a;
+    --warn: #f59e0b;
+    --danger: #dc2626;
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--bd);
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+    padding: 14px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0;
+  }
+  .badge {
+    display: inline-block;
+    border: 1px solid var(--bd);
+    color: var(--muted);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 12px;
+  }
+  .field {
+    background: #fff;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+
+  /* 預設 span-4，方便大多數欄位 */
+  .field:not([class*="span-"]) {
+    grid-column: span 4;
+  }
+  .field label {
+    font-size: 12px;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    border: 0;
+    outline: none;
+    font-size: 14px;
+    background: transparent;
+  }
+  .span-6 {
+    grid-column: span 6;
+  }
+  .span-12 {
+    grid-column: span 12;
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding-top: 8px;
+  }
+  .btn {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--bd);
+    background: #fff;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .btn.primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: transparent;
+  }
+  .btn.ghost {
+    background: #fff;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* 搜尋工具列（僅上方一顆按鈕） */
+  .toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 16px 0 0;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+  }
+  .modal {
+    width: min(1100px, 92vw);
+    max-height: 86vh;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid var(--bd);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--bd);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+  }
+  .modal-title {
+    font-weight: 700;
+  }
+  .modal-body {
+    padding: 12px 14px;
+    overflow: auto;
+  }
+  .modal-footer {
+    border-top: 1px solid var(--bd);
+    padding: 10px 14px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .searchbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+  }
+  .searchbar input[type="search"] {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--bd);
+    font-size: 14px;
+  }
+  .table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+    min-width: 1100px;
+  }
+  .row {
+    background: #fff;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+  }
+  .row td {
+    padding: 8px;
+    border-bottom: 1px dashed #eee;
+    font-size: 14px;
+  }
+  .row td:last-child {
+    border-bottom: 0;
+  }
+  .ok {
+    color: var(--ok);
+  }
+  .warn {
+    color: var(--warn);
+  }
+  .danger {
+    color: var(--danger);
+  }
+  .btn.secondary {
+    background: #f3f4f6;
+    color: var(--text);
+    border: 1px solid var(--bd);
+  }
+</style>
+
+<div class="wrap">
+  <div class="header">
+    <h1>☎️ 總機客服登記</h1>
+    <span class="badge">OneTouch Portal</span>
+  </div>
+
+  <!-- 表單卡片（上半部） -->
+  <form id="ticketForm" class="card" autocomplete="off">
+    <div class="grid">
+      <div class="field">
+        <label>📅 日期</label>
+        <input id="date" name="date_" type="date" required />
+      </div>
+      <div class="field">
+        <label>🕘 接聽時間</label>
+        <input id="answer_time" name="answer_time" type="time" required />
+      </div>
+      <div class="field">
+        <label>📌 狀態</label>
+        <select id="status" name="status"></select>
+      </div>
+      <div class="field">
+        <label>📞 來源</label>
+        <select id="channel" name="channel" required></select>
+      </div>
+
+      <div class="field">
+        <label>👤 來電姓名</label>
+        <input
+          id="caller_name"
+          name="caller_name"
+          type="text"
+          placeholder="王小明"
+        />
+      </div>
+      <div class="field">
+        <label>📱 電話</label>
+        <input id="phone" name="phone" type="tel" placeholder="0912-345-678" />
+      </div>
+      <div class="field span-12">
+        <label>📝 訴求</label>
+        <textarea
+          id="issue"
+          name="issue"
+          required
+          placeholder="請簡述客人訴求…"
+        ></textarea>
+      </div>
+      <div class="field span-6">
+        <label>🏢 轉接部門</label>
+        <select id="dept" name="dept"></select>
+      </div>
+      <div class="field span-6">
+        <label>👥 轉接人員</label>
+        <select id="assignee" name="assignee">
+          <option value="">請先選部門</option>
+        </select>
+      </div>
+      <div class="field span-12">
+        <label>🧾 備註</label>
+        <textarea
+          id="note"
+          name="note"
+          placeholder="補充資訊、溝通重點…"
+        ></textarea>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn secondary" type="button" id="openSearchBtn">
+        🔎 搜尋
+      </button>
+      <button class="btn primary" type="reset">清除</button>
+      <button class="btn primary" type="submit">送出</button>
+    </div>
+  </form>
+
+  <!-- 下半部不再常駐顯示，改為點「搜尋」彈出 Modal -->
+</div>
+
+<!-- 搜尋 Modal -->
+<div class="modal-backdrop" id="searchModal">
+  <div
+    class="modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalTitle"
+  >
+    <div class="modal-header">
+      <div class="searchbar">
+        <strong class="modal-title" id="modalTitle">🔎 客服紀錄搜尋</strong>
+        <input id="q" type="search" placeholder="輸入關鍵字（跨所有欄位）" />
+        <button class="btn primary" id="btnRecent">最近50筆</button>
+      </div>
+      <button class="btn primary" id="closeModal" aria-label="Close">✖</button>
+    </div>
+    <div class="modal-body">
+      <div
+        style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px"
+      >
+        <span class="badge">筆數 <span id="counter">0</span></span>
+      </div>
+      <div class="card" style="padding: 0; border: none; box-shadow: none">
+        <div class="table-wrap" style="overflow: auto">
+          <table class="table">
+            <thead id="thead"></thead>
+            <tbody id="list"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" id="closeModal2">關閉</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  let INIT = {
+    depts: [],
+    agentsByDept: {},
+    channels: [],
+    statuses: [],
+    headers: [],
+  };
+  let HEADERS = [];
+  let CACHE_RECENT = []; // 快取最近 50 筆
+
+  /* ------- 共用 ------- */
+  function fillSelect(sel, items, placeholder) {
+    sel.innerHTML = "";
+    if (placeholder) {
+      const op = document.createElement("option");
+      op.value = "";
+      op.textContent = placeholder;
+      sel.appendChild(op);
+    }
+    (items || []).forEach((v) => {
+      const op = document.createElement("option");
+      op.value = v;
+      op.textContent = v;
+      sel.appendChild(op);
+    });
+  }
+
+  function statusPill(s) {
+    const t = String(s || "").trim();
+    let cls = "";
+    if (t === "已完成") cls = "ok";
+    else if (t === "待回覆") cls = "warn";
+    else if (t === "已轉外部") cls = "danger";
+    return `<span class="${cls}">${esc(t)}</span>`;
+  }
+
+  function esc(s) {
+    return String(s || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  async function api(path) {
+    const r = await fetch(path);
+    return r.json();
+  }
+  async function api_init() {
+    return api("/callcenter/api/init");
+  }
+  async function api_list(q = "") {
+    return api(`/callcenter/api/list?limit=50&q=${encodeURIComponent(q)}`);
+  }
+
+  /* ------- 清單渲染到 Modal ------- */
+  function renderHeader() {
+    const th = $("thead");
+    const ordered = HEADERS.slice();
+    const statusIndex = ordered.indexOf("Status");
+    const noteIndex = ordered.indexOf("Note");
+    if (noteIndex !== -1 && statusIndex !== -1 && noteIndex > statusIndex) {
+      ordered.splice(statusIndex, 0, ordered.splice(noteIndex, 1)[0]);
+    }
+    HEADERS = ordered;
+    th.innerHTML =
+      `<tr>` + HEADERS.map((h) => `<th>${esc(h)}</th>`).join("") + `</tr>`;
+  }
+
+  function renderList(rows) {
+    const tb = $("list");
+    tb.innerHTML = "";
+    $("counter").textContent = rows.length;
+    rows.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.className = "row";
+      tr.innerHTML = HEADERS.map((h) => {
+        const v = r[h];
+        if (h === "Status") return `<td>${statusPill(v)}</td>`;
+        return `<td>${esc(v)}</td>`;
+      }).join("");
+      tb.appendChild(tr);
+    });
+  }
+
+  /* ------- 事件與初始化 ------- */
+  function onDeptChange() {
+    const dept = $("dept").value;
+    const names = (INIT.agentsByDept[dept] || []).map((a) => a);
+    fillSelect($("assignee"), names, "請選擇");
+  }
+
+  // 簡易 debounce
+  function debounce(fn, ms = 300) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  async function openModal(loadRecent = true) {
+    $("searchModal").style.display = "flex";
+    document.body.style.overflow = "hidden";
+    if (loadRecent) {
+      if (CACHE_RECENT.length) {
+        renderList(CACHE_RECENT);
+      } else {
+        const rows = await api_list("");
+        CACHE_RECENT = rows;
+        renderList(rows);
+      }
+    }
+    $("q").focus();
+  }
+  function closeModal() {
+    $("searchModal").style.display = "none";
+    document.body.style.overflow = "";
+  }
+
+  window.addEventListener("load", async () => {
+    // 表單預設今天
+    $("date").value = new Date().toISOString().slice(0, 10);
+
+    INIT = await api_init();
+    HEADERS = INIT.headers || [
+      "TicketID",
+      "Date",
+      "AnswerTime",
+      "CallerName",
+      "Phone",
+      "Issue",
+      "Dept",
+      "Assignee",
+      "Note",
+      "Channel",
+      "Status",
+      "CreatedAt",
+    ];
+    renderHeader();
+
+    fillSelect($("dept"), INIT.depts, "請選擇");
+    fillSelect($("channel"), INIT.channels, "請選擇");
+    fillSelect($("status"), INIT.statuses, "請選擇");
+    $("dept").addEventListener("change", onDeptChange);
+
+    // 送單
+    $("ticketForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(ev.currentTarget);
+      const required = [
+        ["date_", "請選日期"],
+        ["answer_time", "請選時間"],
+        ["channel", "請選來源"],
+        ["issue", "請填訴求"],
+      ];
+      for (const [k, msg] of required) {
+        if (!fd.get(k)) {
+          alert(msg);
+          return;
+        }
+      }
+      const res = await fetch("/callcenter/api/ticket", {
+        method: "POST",
+        body: fd,
+      });
+      const j = await res.json();
+      if (j.ok) {
+        alert("已送出！TicketID：" + j.ticketId);
+        ev.currentTarget.reset();
+        $("date").value = new Date().toISOString().slice(0, 10);
+        // 送單後更新快取的最近 50 筆（若已開過）
+        CACHE_RECENT = await api_list("");
+        if ($("searchModal").style.display === "flex") renderList(CACHE_RECENT);
+      } else {
+        alert("送出失敗：" + (j.error || ""));
+      }
+    });
+
+    // Modal 開關
+    $("openSearchBtn").addEventListener("click", () => openModal(true));
+    $("closeModal").addEventListener("click", closeModal);
+    $("closeModal2").addEventListener("click", closeModal);
+    $("searchModal").addEventListener("click", (e) => {
+      if (e.target === $("searchModal")) closeModal(); // 按遮罩關閉
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeModal();
+    });
+
+    // 搜尋
+    $("q").addEventListener(
+      "input",
+      debounce(async (e) => {
+        const q = e.target.value.trim();
+        if (!q) {
+          renderList(CACHE_RECENT);
+          return;
+        }
+        const rows = await api_list(q);
+        renderList(rows);
+      }, 300)
+    );
+
+    // 最近 50 筆
+    $("btnRecent").addEventListener("click", async () => {
+      $("q").value = "";
+      CACHE_RECENT = await api_list("");
+      renderList(CACHE_RECENT);
+    });
+  });
+</script>
+{% endblock %}

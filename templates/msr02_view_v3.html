@@ -1,4 +1,4 @@
-{% extends "base.html" %} {% block title %}客房住房率統計表 - {{ super() }}{%
+{% extends "base.html" %} {% block title %}MSR02 Excel 檢視 - {{ super() }}{%
 endblock %} {% block content %}
 <style>
   /* --- 捲軸與桌面樣式（比照參考頁） --- */
@@ -284,7 +284,7 @@ endblock %} {% block content %}
 
 <div class="page-wrap">
   <div class="container">
-    <h1 class="page-title">客房住房率統計表（MSR02）</h1>
+    <h1 class="page-title">資料呈現（MSR02）</h1>
 
     {% if error %}
     <div
@@ -720,259 +720,171 @@ endblock %} {% block content %}
 <!-- Chart.js（CDN 版；若內網封閉可改放到 /static/js） -->
 <script src="{{ url_for('static', path='js/chart.4.4.3.min.js') }}"></script>
 <script>
-  // === 表頭點擊開趨勢圖（支援勾選清單、匯出 PNG/CSV） ===
-  const _isPercentColName =
-    typeof isPercentColName === "function"
-      ? isPercentColName
-      : (name) => /[%％]|率/.test(name);
-  const ths = Array.from(document.getElementById("table-header").children);
+    // === 表頭點擊開趨勢圖（支援勾選清單、匯出 PNG/CSV） ===
+    const _isPercentColName = (typeof isPercentColName === 'function') ? isPercentColName : (name) => /[%％]|率/.test(name);
+    const ths = Array.from(document.getElementById('table-header').children);
 
-  const modal = document.getElementById("chart-modal");
-  const closeBtn = document.getElementById("chart-close");
-  const checklist = document.getElementById("series-checklist");
-  const btnAll = document.getElementById("select-all");
-  const btnClr = document.getElementById("clear-all");
-  const btnUpd = document.getElementById("update-chart");
-  const btnPNG = document.getElementById("download-png");
-  const btnCSV = document.getElementById("download-csv");
+    const modal    = document.getElementById('chart-modal');
+    const closeBtn = document.getElementById('chart-close');
+    const checklist= document.getElementById('series-checklist');
+    const btnAll   = document.getElementById('select-all');
+    const btnClr   = document.getElementById('clear-all');
+    const btnUpd   = document.getElementById('update-chart');
+    const btnPNG   = document.getElementById('download-png');
+    const btnCSV   = document.getElementById('download-csv');
 
-  function openModal() {
-    modal.style.display = "flex";
-  }
-  function closeModal() {
-    modal.style.display = "none";
-  }
-  closeBtn.addEventListener("click", closeModal);
-  modal.addEventListener("click", (e) => {
-    if (e.target === modal) closeModal();
-  });
+    function openModal(){ modal.style.display='flex'; }
+    function closeModal(){ modal.style.display='none'; }
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
 
-  let trendChart = null;
+    let trendChart = null;
 
-  // 允許加入圖的欄位（排除：日期、第二欄、最後一欄「平均」）
-  const lastIndex = ths.length - 1;
-  const selectableIdx = ths
-    .map((th, i) => i)
-    .filter((i) => i !== 0 && i !== 1 && i !== lastIndex);
+    // 允許加入圖的欄位（排除：日期、第二欄、最後一欄「平均」）
+    const lastIndex = ths.length - 1;
+    const selectableIdx = ths.map((th,i)=>i).filter(i => i !== 0 && i !== 1 && i !== lastIndex);
 
-  // 產生勾選清單
-  function buildChecklist() {
-    const html = selectableIdx
-      .map((i) => {
+    // 產生勾選清單
+    function buildChecklist() {
+      const html = selectableIdx.map(i => {
         const name = ths[i].textContent.trim();
-        const checked =
-          window.overlayCols && window.overlayCols.has(i) ? "checked" : "";
-        return (
-          '<label><input type="checkbox" value="' +
-          i +
-          '" ' +
-          checked +
-          "/> " +
-          name +
-          "</label>"
-        );
-      })
-      .join("");
-    checklist.innerHTML =
-      html || '<div style="color:#6b7280">（無可選欄位）</div>';
-  }
-  function selectedColsFromChecklist() {
-    return Array.from(
-      checklist.querySelectorAll('input[type="checkbox"]:checked')
-    ).map((el) => Number(el.value));
-  }
+        const checked = window.overlayCols && window.overlayCols.has(i) ? 'checked' : '';
+        return '<label><input type="checkbox" value="'+i+'" '+checked+'/> '+name+'</label>';
+      }).join('');
+      checklist.innerHTML = html || '<div style="color:#6b7280">（無可選欄位）</div>';
+    }
+    function selectedColsFromChecklist(){
+      return Array.from(checklist.querySelectorAll('input[type="checkbox"]:checked')).map(el => Number(el.value));
+    }
 
-  btnAll.addEventListener("click", () => {
-    checklist
-      .querySelectorAll('input[type="checkbox"]')
-      .forEach((el) => (el.checked = true));
-  });
-  btnClr.addEventListener("click", () => {
-    checklist
-      .querySelectorAll('input[type="checkbox"]')
-      .forEach((el) => (el.checked = false));
-  });
-  btnUpd.addEventListener("click", () => {
-    const cols = selectedColsFromChecklist();
-    if (!cols.length) return;
-    window.overlayCols = new Set(cols);
-    buildAndShowChart(cols);
-  });
-
-  function buildAndShowChart(cols) {
-    if (!cols.length) return;
-
-    // 橫軸：日期
-    const labels = [];
-    allRows.forEach((tr) => {
-      const d = tr.children[0]?.textContent?.trim() ?? "";
-      if (d) labels.push(d);
+    btnAll.addEventListener('click', ()=>{ checklist.querySelectorAll('input[type="checkbox"]').forEach(el=> el.checked = true); });
+    btnClr.addEventListener('click', ()=>{ checklist.querySelectorAll('input[type="checkbox"]').forEach(el=> el.checked = false); });
+    btnUpd.addEventListener('click', ()=>{
+      const cols = selectedColsFromChecklist();
+      if (!cols.length) return;
+      window.overlayCols = new Set(cols);
+      buildAndShowChart(cols);
     });
 
-    const datasets = [];
-    let hasPercent = false,
-      hasNumber = false;
-    cols.forEach((ci) => {
-      const name = ths[ci].textContent.trim();
-      const isPct = _isPercentColName(name);
-      if (isPct) hasPercent = true;
-      else hasNumber = true;
+    function buildAndShowChart(cols){
+      if (!cols.length) return;
 
-      const values = [];
-      allRows.forEach((tr) => {
-        const vText = tr.children[ci]?.textContent?.trim() ?? "";
-        // ✅ 修正：同時去掉逗號與 %／％
-        const n = Number(String(vText).replace(/[,%％]/g, ""));
-        values.push(Number.isFinite(n) ? n : null);
+      // 橫軸：日期
+      const labels = [];
+      allRows.forEach(tr => { const d = tr.children[0]?.textContent?.trim() ?? ''; if (d) labels.push(d); });
+
+      const datasets = [];
+      let hasPercent = false, hasNumber = false;
+      cols.forEach(ci => {
+        const name = ths[ci].textContent.trim();
+        const isPct = _isPercentColName(name);
+        if (isPct) hasPercent = true; else hasNumber = true;
+
+        const values = [];
+        allRows.forEach(tr => {
+          const vText = tr.children[ci]?.textContent?.trim() ?? '';
+          const n = Number(String(vText).replace(/,/g, ''));
+          values.push(Number.isFinite(n) ? n : null);
+        });
+
+        datasets.push({ label: name, data: values, tension: 0.2, pointRadius: 2, yAxisID: (isPct && hasNumber) ? 'y1' : 'y' });
       });
 
-      datasets.push({
-        label: name,
-        data: values,
-        tension: 0.2,
-        pointRadius: 2,
-        yAxisID: isPct && hasNumber ? "y1" : "y",
-      });
-    });
+      const ctx = document.getElementById('trend-canvas').getContext('2d');
+      if (trendChart) trendChart.destroy();
 
-    const ctx = document.getElementById("trend-canvas").getContext("2d");
-    if (trendChart) trendChart.destroy();
+      // 若 Chart.js 未載入，也能讓彈窗開啟並提示
+      if (!window.Chart) {
+        document.getElementById('chart-title').textContent = '趨勢圖（需要 Chart.js）';
+        document.getElementById('chart-note').textContent = '找不到 Chart.js，請確認已放置於 static/js/chart.4.4.3.min.js。';
+        openModal();
+        return;
+      }
 
-    // Chart.js 尚未載入：給提示
-    if (!window.Chart) {
-      document.getElementById("chart-title").textContent =
-        "趨勢圖（需要 Chart.js）";
-      document.getElementById("chart-note").textContent =
-        "找不到 Chart.js，已嘗試以 CDN 後備載入，若仍無法顯示請檢查網路或本機檔。";
+      const scales = {};
+      if (hasNumber) { scales.y = { title: { display: true, text: '數值' }, ticks: { callback: v => (v && v.toLocaleString ? v.toLocaleString() : v) } }; }
+      if (hasPercent) { const key = hasNumber ? 'y1' : 'y'; scales[key] = { position: hasNumber ? 'right' : 'left', beginAtZero: true, title: { display: true, text: '百分比' }, ticks: { callback: v => v+'%' } }; }
+
+      trendChart = new Chart(ctx, { type: 'line', data: { labels, datasets }, options: { maintainAspectRatio: false, plugins: { legend: { display: true }, tooltip: { mode: 'index', intersect: false } }, scales } });
+
+      var titleText = (cols.length === 1) ? ths[cols[0]].textContent.trim()+'｜趨勢圖' : cols.length+' 欄疊加｜趨勢圖';
+      document.getElementById('chart-title').textContent = titleText;
+      document.getElementById('chart-note').textContent = '提示：勾選欄位後按「更新圖表」。可下載 PNG / CSV。';
+
+      window.overlayCols = new Set(cols);
+      applyHighlights();
       openModal();
-      return;
     }
 
-    const scales = {};
-    if (hasNumber) {
-      scales.y = {
-        title: { display: true, text: "數值" },
-        ticks: {
-          callback: (v) => (v && v.toLocaleString ? v.toLocaleString() : v),
-        },
-      };
-    }
-    if (hasPercent) {
-      const key = hasNumber ? "y1" : "y";
-      scales[key] = {
-        position: hasNumber ? "right" : "left",
-        beginAtZero: true,
-        title: { display: true, text: "百分比" },
-        ticks: { callback: (v) => v + "%" },
-      };
-    }
-
-    trendChart = new Chart(ctx, {
-      type: "line",
-      data: { labels, datasets },
-      options: {
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: true },
-          tooltip: { mode: "index", intersect: false },
-        },
-        scales,
-      },
+    // 匯出：PNG
+    btnPNG.addEventListener('click', ()=>{
+      if (!window.Chart || !trendChart) return;
+      const url = trendChart.toBase64Image();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (document.getElementById('chart-title').textContent.split(' ').join('_') || 'chart') + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
     });
 
-    var titleText =
-      cols.length === 1
-        ? ths[cols[0]].textContent.trim() + "｜趨勢圖"
-        : cols.length + " 欄疊加｜趨勢圖";
-    document.getElementById("chart-title").textContent = titleText;
-    document.getElementById("chart-note").textContent =
-      "提示：勾選欄位後按「更新圖表」。可下載 PNG / CSV。";
-
-    window.overlayCols = new Set(cols);
-    applyHighlights();
-    openModal();
-  }
-
-  // 匯出：PNG
-  btnPNG.addEventListener("click", () => {
-    if (!window.Chart || !trendChart) return;
-    const url = trendChart.toBase64Image();
-    const a = document.createElement("a");
-    a.href = url;
-    a.download =
-      (document
-        .getElementById("chart-title")
-        .textContent.split(" ")
-        .join("_") || "chart") + ".png";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  });
-
-  // 匯出：CSV（原始資料）
-  btnCSV.addEventListener("click", () => {
-    const cols = selectedColsFromChecklist();
-    if (!cols.length) return;
-    const header = ["日期"].concat(
-      cols.map((ci) => ths[ci].textContent.trim())
-    );
-    const rows = [header];
-    allRows.forEach((tr) => {
-      const date = tr.children[0]?.textContent?.trim() ?? "";
-      const arr = [date];
-      cols.forEach((ci) => {
-        const vText = tr.children[ci]?.textContent?.trim() ?? "";
-        const n = Number(String(vText).replace(/[,%％]/g, ""));
-        arr.push(Number.isFinite(n) ? n : "");
+    // 匯出：CSV（原始資料）
+    btnCSV.addEventListener('click', ()=>{
+      const cols = selectedColsFromChecklist();
+      if (!cols.length) return;
+      const header = ['日期'].concat(cols.map(ci => ths[ci].textContent.trim()));
+      const rows = [header];
+      allRows.forEach(tr => {
+        const date = tr.children[0]?.textContent?.trim() ?? '';
+        const arr = [date];
+        cols.forEach(ci => {
+          const vText = tr.children[ci]?.textContent?.trim() ?? '';
+          const n = Number(String(vText).replace(/,/g, ''));
+          arr.push(Number.isFinite(n) ? n : '');
+        });
+        rows.push(arr);
       });
-      rows.push(arr);
+      const csv = rows.map(r => r.map(function(x){
+        if (typeof x === 'string' && x.indexOf(',') !== -1) { return '"'+ x.replace(/"/g,'""') +'"'; }
+        return x;
+      }).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'chart_data.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
     });
-    const csv = rows
-      .map((r) =>
-        r
-          .map(function (x) {
-            if (typeof x === "string" && x.indexOf(",") !== -1) {
-              return '"' + x.replace(/"/g, '""') + '"';
-            }
-            return x;
-          })
-          .join(",")
-      )
-      .join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "chart_data.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  });
 
-  // 表頭點擊：快速打開 + 同步勾選
-  function syncChecklistFromOverlay() {
-    checklist.querySelectorAll('input[type="checkbox"]').forEach((el) => {
-      el.checked =
-        window.overlayCols && window.overlayCols.has(Number(el.value));
+    // 表頭點擊：快速打開 + 同步勾選
+    function syncChecklistFromOverlay(){
+      checklist.querySelectorAll('input[type="checkbox"]').forEach(el => { el.checked = window.overlayCols && window.overlayCols.has(Number(el.value)); });
+    }
+
+    const skipColChart = new Set([0, 1, lastIndex]);
+    ths.forEach((th, i) => {
+      th.style.cursor = skipColChart.has(i) ? 'default' : 'pointer';
+      if (skipColChart.has(i)) return;
+      th.title = '點擊看趨勢；也可用勾選清單疊加/移除';
+      th.addEventListener('click', () => {
+        window.overlayCols = new Set([i]);
+        buildChecklist();
+        syncChecklistFromOverlay();
+        buildAndShowChart([i]);
+      });
     });
-  }
 
-  const skipColChart = new Set([0, 1, lastIndex]);
-  ths.forEach((th, i) => {
-    th.style.cursor = skipColChart.has(i) ? "default" : "pointer";
-    if (skipColChart.has(i)) return;
-    th.title = "點擊看趨勢；也可用勾選清單疊加/移除";
-    th.addEventListener("click", () => {
-      window.overlayCols = new Set([i]);
-      buildChecklist();
-      syncChecklistFromOverlay();
-      buildAndShowChart([i]);
-    });
-  });
+    /* 底部縱向平均列（Sticky Bottom） */
+      tbody tr.summary-row td {
+        position: sticky;
+        bottom: 0;
+        background: #eef2ff;
+        font-weight: 700;
+        border-top: 2px solid #c7d2fe;
+      }
+      /* 與左/右側 sticky 欄位並存的層級 */
+      tbody tr.summary-row td:first-child { z-index: 30; }
+      tbody tr.summary-row td:last-child  { z-index: 30; }
 
-  // 首次建立清單（不開圖）
-  buildChecklist();
+    // 首次建立清單（不開圖）
+    buildChecklist();
 </script>
 
 {% endblock %}

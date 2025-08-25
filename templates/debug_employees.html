@@ -1,0 +1,102 @@
+{% extends "base.html" %} {% block title %}除錯: 員工資料表{% endblock %} {%
+block content %}
+<style>
+  .wrap {
+    max-width: 1200px;
+    margin: auto;
+    padding: 16px;
+    font-family: sans-serif;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    padding: 16px 24px;
+    margin-bottom: 16px;
+  }
+  .db-path {
+    font-family: monospace;
+    background: #f3f4f6;
+    padding: 4px 8px;
+    border-radius: 6px;
+    word-break: break-all;
+  }
+  .error {
+    color: #b91c1c;
+    background: #fee2e2;
+    border: 1px solid #fca5a5;
+    padding: 12px;
+    border-radius: 8px;
+  }
+  .no-data {
+    color: #6b7280;
+    font-style: italic;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    table-layout: auto;
+  }
+  th,
+  td {
+    border: 1px solid #ddd;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 14px;
+  }
+  th {
+    background-color: #f9fafb;
+    font-weight: 600;
+  }
+  tbody tr:nth-child(odd) {
+    background-color: #fcfcfc;
+  }
+</style>
+
+<div class="wrap">
+  <div class="card">
+    <h2>📍 資料庫路徑</h2>
+    <p>您的應用程式目前正嘗試讀取以下路徑的資料庫檔案：</p>
+    <p class="db-path">{{ db_path }}</p>
+    <p class="no-data" style="margin-top: 8px">
+      請務必確認這個路徑是否與您存放 `approvals.db` 檔案的實際路徑完全相符。
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>📋 `employees` 資料表內容</h2>
+
+    {% if error %}
+    <div class="error"><strong>發生錯誤：</strong> {{ error }}</div>
+    {% elif employees %}
+    <p>查詢成功！共找到 <strong>{{ employees|length }}</strong> 筆資料。</p>
+    <div style="overflow-x: auto">
+      <table>
+        <thead>
+          <tr>
+            {% for col in columns %}
+            <th>{{ col }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for emp in employees %}
+          <tr>
+            {% for col in columns %}
+            <td>{{ emp[col] }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="no-data">
+      在此資料庫檔案中找不到任何員工資料，或者 `employees` 資料表不存在。
+    </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+{% block title %}簽核詳情 - {{ approval.subject }} · {{ super() if super else 'OneTouch' }}{% endblock %}
+{% block content %}
+
+<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
+<style>
+  .wrap{max-width:1100px;margin:auto;padding:12px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.06);padding:16px;margin-bottom:12px}
+  .muted{color:#6b7280}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1 1 260px}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid #ddd;font-size:12px}
+  .ok{background:#ecfdf5}
+  .warn{background:#fffbeb}
+  .danger{background:#fee2e2}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid #eee;padding:8px;text-align:left;vertical-align:top}
+  .btn{border:1px solid #2563eb;padding:10px 14px;border-radius:10px;cursor:pointer}
+  .btn.primary{background:#2563eb;color:#fff}
+  textarea,input[type="text"],select{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px}
+  .ql-editor.readonly{padding:0}
+
+  /* 內容框緊湊 */
+  .content-box { border:1px solid #ddd;border-radius:8px;padding:6px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12); }
+  .content-box .ql-snow{ padding:0;border:0;background:transparent; }
+  .content-box .ql-editor{ padding:0;min-height:unset;line-height:1.45; }
+  .content-box .ql-editor p{ margin:.25em 0; }
+
+  /* 搜尋 Modal（沿用 new.html 風格） */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:60}
+  .modal{width:min(1100px,92vw);max-height:86vh;overflow:hidden;background:#fff;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.18);display:flex;flex-direction:column}
+  .modal-header{padding:12px 14px;border-bottom:1px solid #e5e7eb;display:flex;gap:10px;align-items:center;justify-content:space-between}
+  .modal-title{font-weight:700}
+  .modal-body{padding:12px 14px;overflow:auto}
+  .modal-footer{border-top:1px solid #e5e7eb;padding:10px 14px;display:flex;justify-content:flex-end;gap:8px}
+  .searchbar{display:flex;gap:8px;align-items:center;width:100%}
+  .searchbar input[type="search"]{flex:1;padding:10px;border-radius:10px;border:1px solid #e5e7eb;font-size:14px}
+  .table{width:100%;border-collapse:separate;border-spacing:0 8px;min-width:900px}
+  .rowr{background:#fff;border:1px solid #e5e7eb;border-radius:10px}
+  .rowr td{padding:8px;border-bottom:1px dashed #eee;font-size:14px}
+  .rowr td:last-child{border-bottom:0}
+  .btn.sm{padding:6px 10px;font-size:12px;border-radius:8px}
+
+  /* 可拖拉列的游標提示 */
+  tr.draggable { cursor: grab; }
+</style>
+
+<div class="wrap">
+
+  {% if can_act %}
+    <div class="card" style="border-color:#86efac;background:#f0fdf4">✅ 你是 <strong>#{{ approval.current_step + 1 }}</strong> 關的簽核人，請完成簽核。</div>
+  {% elif approval.status == 'pending' and approval.current_step >= 0 and current_step_obj %}
+    <div class="card" style="border-color:#fde68a;background:#fffbeb">⏳ 目前簽核人：<strong>{{ current_step_obj.approver_name }}</strong>（第 #{{ approval.current_step + 1 }} 關）</div>
+  {% endif %}
+  {% if request.query_params.get('error') == 'comment_required' %}
+    <div class="card" style="border-color:#fecaca;background:#fef2f2;color:#991b1b">⚠️ 簽核意見為必填，請填寫後再送出。</div>
+  {% endif %}
+
+  <div class="card">
+    <div class="row" style="align-items:center;justify-content:space-between">
+  <h2>📄 {{ approval.subject }}</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        {% if role == 'admin' %}
+          <button class="btn" id="btnBuildIdx" title="修復序號並建立唯一索引">🛠 一鍵修復/建立索引</button>
+          <button class="btn" id="btnBuildEmpIdx" title="建立員工搜尋索引">🛠 員工索引</button>
+        {% endif %}
+        {% if approval.status == 'approved' %}
+          <span class="badge ok">完成</span>
+        {% elif approval.status == 'rejected' %}
+          <span class="badge warn">退回</span>
+        {% else %}
+          <span class="badge" style="color:#2563eb">進行中</span>
+        {% endif %}
+      </div>
+    </div>
+
+    </div>
+    <div class="row">
+      <div class="col"><strong>送簽人：</strong>{{ approval.requester }}</div>
+      <div class="col"><strong>送簽部門：</strong>{{ approval.requester_dept or '-' }}</div>
+      <div class="col"><strong>送簽時間：</strong><span class="muted">{{ approval.submitted_at }}</span></div>
+      <div class="col" style="color:#2563eb"><strong>目前關卡：</strong>{% if approval.current_step>=0 %}#{{ approval.current_step + 1 }}{% else %}-{% endif %}</div>
+    </div>
+
+    <strong>內容：</strong>
+    <div class="content-box" style="margin-top:6px">
+      <div class="ql-snow">
+        <div class="ql-editor readonly">{{ (approval.description|trim)|safe if approval.description else '（無）' }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📎 附件</h3>
+    {% if attachments and attachments|length>0 %}
+      <table>
+        <thead><tr><th>檔名</th><th>大小</th><th>上傳者</th><th>時間</th><th></th></tr></thead>
+        <tbody>
+        {% for f in attachments %}
+        <tr>
+          <td>{{ f.name }}</td>
+          <td class="muted">{{ (f.size/1024/1024)|round(2) }} MB</td>
+          <td>{{ f.by or '-' }}</td>
+          <td class="muted">{{ f.at }}</td>
+          <td><a class="btn" href="/approvals/{{ approval.id }}/file/{{ f.id }}">下載</a></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">無附件。</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>🧭 串簽流程</h3>
+
+    {% if can_manage_chain %}
+      <!-- 跟 new.html 一致的「選部門→選人員→加入 / 跨區搜尋」 -->
+      <div class="row" style="margin:8px 0 12px">
+        <div class="col">
+          <label>選擇部門</label>
+          <select id="dept">
+            <option value="">-- 選擇部門 --</option>
+            {% for d in departments %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col">
+          <label>選擇人員</label>
+          <select id="person">
+            <option value="">請先選部門</option>
+          </select>
+        </div>
+        <div class="col" style="align-self:flex-end;display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn" id="btnAddPick">➕ 加入</button>
+          <button type="button" class="btn" id="openSearchBtn">🔎 跨區搜尋</button>
+        </div>
+      </div>
+    {% endif %}
+
+    <table>
+      <thead>
+        <tr><th style="width:70px">關卡</th><th>簽核人</th><th style="width:130px">狀態</th><th style="width:170px">處理時間</th><th>意見</th></tr>
+      </thead>
+      <tbody id="stepsTbody">
+        {% for s in steps %}
+        <tr
+          data-step-id="{{ s.id }}"
+          data-step-order="{{ s.step_order }}"
+          data-pending="{{ 1 if s.status=='pending' else 0 }}"
+          draggable="{% if s.status=='pending' and s.step_order>approval.current_step and can_manage_chain %}true{% else %}false{% endif %}"
+          class="{% if s.status=='pending' and s.step_order>approval.current_step and can_manage_chain %}draggable{% endif %}"
+          {% if approval.current_step == s.step_order and s.status=='pending' %}style="background:#f9fafb"{% endif %}
+        >
+          <td>#{{ s.step_order + 1 }}</td>
+          <td>
+            {% if s.status=='pending' and s.step_order>approval.current_step and can_manage_chain %}
+              <span style="cursor:grab;margin-right:6px">⠿</span>
+            {% endif %}
+            {{ s.approver_name }}
+            <div class="muted">{{ s.approver_email or '' }}</div>
+          </td>
+          <td>
+            {% if s.status == 'approved' %}<span class="badge ok">同意</span>
+            {% elif s.status == 'rejected' %}<span class="badge danger">退回</span>
+            {% else %}<span class="badge">待簽</span>{% endif %}
+          </td>
+          <td class="muted">{{ s.decided_at or '' }}</td>
+          <td style="white-space:pre-wrap">{{ s.comment or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if can_act %}
+      <form method="post" action="/approvals/{{ approval.id }}/action" style="margin-top:16px">
+        <label>簽核意見（必填）</label>
+        <textarea id="comment" name="comment" rows="4" placeholder="輸入給申請人或下一關的訊息…"></textarea>
+        <input type="hidden" name="action" id="actField" value="approve">
+        <div style="margin-top:10px;display:flex;gap:10px">
+          <button class="btn primary" onclick="document.getElementById('actField').value='approve'">✅ 同意</button>
+          <button class="btn" onclick="document.getElementById('actField').value='reject'">↩️ 退回</button>
+          <a href="/approvals" class="btn">返回清單</a>
+        </div>
+        <p class="muted" style="margin-top:6px">你是此單目前關卡的簽核人，處理後系統會自動通知下一關或申請人。</p>
+      </form>
+    {% else %}
+      <div style="margin-top:10px">
+        <a href="/approvals" class="btn">返回清單</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>🗂️ 歷程</h3>
+    {% if actions and actions|length>0 %}
+      <table>
+        <thead><tr><th style="width:160px">時間</th><th style="width:140px">動作者</th><th style="width:100px">動作</th><th>內容</th></tr></thead>
+        <tbody>
+          {% for a in actions %}
+          <tr>
+            <td class="muted">{{ a.created_at }}</td>
+            <td>{{ a.actor }}</td>
+            <td>{{ '送出' if a.action=='submit' else ('同意' if a.action=='approve' else ('退回' if a.action=='reject' else a.action)) }}</td>
+            <td style="white-space:pre-wrap">{{ a.note or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">尚無歷程。</p>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+(function(){
+  const canManage = {{ 'true' if can_manage_chain else 'false' }};
+  const approvalId = {{ approval.id }};
+  const curStep = {{ approval.current_step if approval.current_step is not none else -1 }};
+
+  // === A) 選部門 → 載人員 ===
+  if (canManage){
+    const $ = (id)=>document.getElementById(id);
+    const deptEl = $("dept"), personEl = $("person");
+
+    deptEl?.addEventListener("change", async (e)=>{
+      const d = e.target.value;
+      personEl.innerHTML = `<option value="">${d ? "載入中…" : "請先選部門"}</option>`;
+      if(!d) return;
+      const res = await fetch(`/approvals/approvers?dept=${encodeURIComponent(d)}`);
+      const data = await res.json();
+      personEl.innerHTML = `<option value="">-- 選擇人員 --</option>`;
+      (data.names||[]).forEach((n)=>{
+        const op = document.createElement("option");
+        op.value = n; op.textContent = n;
+        personEl.appendChild(op);
+      });
+    });
+
+    // === B) 由下拉加入 ===
+    $("btnAddPick")?.addEventListener("click", async ()=>{
+      const name = (personEl?.value || "").trim();
+      if(!name){ alert("請先選擇人員"); return; }
+      const fd = new FormData(); fd.append("display_name", name);
+      const res = await fetch(`/approvals/${approvalId}/steps/add`, {method:"POST", body:fd});
+      const j = await res.json();
+      if(!j.ok){ alert("加入失敗：" + (j.error||res.status)); return; }
+      location.reload();
+    });
+
+    // === C) 跨區搜尋 Modal ===
+    const HEADERS = ["Department","Department_1","EnglishName","Name","Email","Ext","Pick"];
+    function esc(s){ return String(s||"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;"); }
+    function rowToLabel(r){
+      const en=(r.EnglishName||"").trim(), nm=(r.Name||"").trim();
+      return en&&nm ? `${en} ${nm}` : (en||nm);
+    }
+    const modalHTML = `
+      <div class="modal-backdrop" id="searchModal">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+          <div class="modal-header">
+            <div class="searchbar">
+              <strong class="modal-title" id="modalTitle">🔎 簽核人員跨區搜尋</strong>
+              <input id="q" type="search" placeholder="輸入關鍵字…" />
+              <button class="btn primary" id="btnRecent" type="button">最近50筆</button>
+            </div>
+            <button class="btn primary" id="closeModal" type="button">✖</button>
+          </div>
+          <div class="modal-body">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <span class="pill" style="border:1px solid #d1d5db;border-radius:8px;padding:6px 10px">筆數 <strong id="counter" style="margin-left:6px">0</strong></span>
+            </div>
+            <div class="table-wrap" style="overflow:auto">
+              <table class="table">
+                <thead id="thead"></thead>
+                <tbody id="list"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn" id="closeModal2" type="button">關閉</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.insertAdjacentHTML("beforeend", modalHTML);
+
+    const $$ = (id)=>document.getElementById(id);
+    function renderHeader(){ $$("#thead").innerHTML = `<tr>${HEADERS.map(h=>`<th style="text-align:left;padding:6px 8px">${esc(h)}</th>`).join("")}</tr>`; }
+    function renderList(rows){
+      const tb=$$("#list"); tb.innerHTML=""; $$("#counter").textContent = rows.length;
+      rows.forEach(r=>{
+        const tr=document.createElement("tr");
+        tr.className="rowr";
+        tr.innerHTML = `
+          <td>${esc(r.Department||"")}</td>
+          <td>${esc(r.Department_1||"")}</td>
+          <td>${esc(r.EnglishName||"")}</td>
+          <td>${esc(r.Name||"")}</td>
+          <td>${esc(r.Email||"")}</td>
+          <td>${esc(r.Ext||"")}</td>
+          <td><button class="btn primary sm" type="button">➕ 加入</button></td>`;
+        tr.querySelector("button").addEventListener("click", async ()=>{
+          const label = rowToLabel(r); if(!label) return;
+          const fd=new FormData(); fd.append("display_name", label);
+          const res = await fetch(`/approvals/${approvalId}/steps/add`, {method:"POST", body:fd});
+          const j = await res.json();
+          if(!j.ok){ alert("加入失敗：" + (j.error||res.status)); return; }
+          closeModal(); location.reload();
+        });
+        tr.addEventListener("dblclick", ()=>tr.querySelector("button").click());
+        tb.appendChild(tr);
+      });
+    }
+    async function api_search(q="",limit=500){
+      const r = await fetch(`/approvals/api/approvers/search?limit=${limit}&q=${encodeURIComponent(q)}`);
+      return r.json();
+    }
+    function openModal(loadRecent=true){
+      $$("#searchModal").style.display="flex"; document.body.style.overflow="hidden";
+      if(loadRecent){ api_search("").then(renderList); }
+      $$("#q").focus();
+    }
+    function closeModal(){
+      $$("#searchModal").style.display="none"; document.body.style.overflow="";
+    }
+    document.getElementById("openSearchBtn")?.addEventListener("click", ()=>{ renderHeader(); openModal(true); });
+    document.addEventListener("click",(e)=>{ if(e.target?.id==="closeModal"||e.target?.id==="closeModal2") closeModal(); });
+    document.body.addEventListener("click",(e)=>{ if(e.target?.id==="searchModal") closeModal(); });
+    document.addEventListener("keydown",(e)=>{ if(e.key==="Escape") closeModal(); });
+    let t=null;
+    document.body.addEventListener("input", (e)=>{
+      if(e.target?.id!=="q") return;
+      clearTimeout(t);
+      t=setTimeout(async ()=>{
+        const q=e.target.value.trim();
+        renderList(await api_search(q||"", 500));
+      }, 300);
+    });
+  }
+
+  // === D) 拖曳重排（僅「未簽」且序號 > current_step 的列） ===
+  const tbody = document.getElementById('stepsTbody');
+  let dragEl=null;
+  tbody?.addEventListener('dragstart', (e)=>{
+    const tr=e.target.closest('tr.draggable'); if(!tr) return;
+    dragEl=tr; e.dataTransfer.effectAllowed='move';
+  });
+  tbody?.addEventListener('dragover', (e)=>{
+    if(!dragEl) return;
+    const over=e.target.closest('tr'); if(!over) return;
+    const canDrop = (over.dataset.pending==='1' && Number(over.dataset.stepOrder)>curStep);
+    if(!canDrop) return;
+    e.preventDefault();
+    const rect=over.getBoundingClientRect();
+    const after=(e.clientY-rect.top)>(rect.height/2);
+    if(after) over.after(dragEl); else over.before(dragEl);
+  });
+  document.addEventListener('dragend', async ()=>{
+    if(!dragEl) return;
+    const rows=[...tbody.querySelectorAll('tr')].filter(tr=>tr.dataset.pending==='1' && Number(tr.dataset.stepOrder)>curStep);
+    const order=rows.map(tr=>Number(tr.dataset.stepId));
+    dragEl=null;
+    try{
+      const res=await fetch(`/approvals/${approvalId}/steps/reorder`,{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({order})
+      });
+      const j=await res.json(); if(!j.ok){ alert('重排失敗：'+(j.error||res.status)); } else { location.reload(); }
+    }catch(e){ alert('重排失敗'); }
+  });
+
+  // 快捷鍵：A 同意、R 退回（只有可簽核者才會有效）
+  document.addEventListener('keydown', function(e){
+    const actField = document.getElementById('actField');
+    if(!actField) return;
+    if(e.key.toLowerCase()==='a'){ actField.value='approve'; document.querySelector('button.btn.primary')?.click(); }
+    if(e.key.toLowerCase()==='r'){ actField.value='reject';  document.querySelectorAll('button.btn')[1]?.click(); }
+  });
+})();
+</script>
+<script>
+(function(){
+  const btn1 = document.getElementById('btnBuildIdx');
+  const btn2 = document.getElementById('btnBuildEmpIdx');
+
+  async function call(url, btn){
+    if(!btn) return;
+    try{
+      btn.disabled = true;
+      const res = await fetch(url, {method: 'POST'});
+      const j = await res.json();
+      alert(j.ok ? (j.msg || '完成') : ('失敗：' + (j.error || res.status)));
+      if(j.ok) location.reload();
+    }catch(e){
+      alert('發生錯誤：' + (e?.message || e));
+    }finally{
+      btn.disabled = false;
+    }
+  }
+
+  btn1?.addEventListener('click', ()=> call('/approvals/debug/build_step_index', btn1));
+  btn2?.addEventListener('click', ()=> call('/approvals/debug/build_employee_indexes', btn2));
+})();
+</script>
+
+{% endblock %}

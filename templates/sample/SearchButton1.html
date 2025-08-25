@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Animated Show/Hide Search Bar</title>
+    <style>
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background: #f1f1f1;
+        font-family: Arial, sans-serif;
+      }
+
+      .search {
+        position: relative;
+        height: 45px;
+        display: flex;
+        align-items: center;
+      }
+
+      .search input {
+        border: none;
+        outline: none;
+        padding: 0 12px;
+        font-size: 16px;
+        width: 0px;
+        height: 45px;
+        border-radius: 25px;
+        transition: width 0.4s ease, opacity 0.3s ease;
+        background: #fff;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+        opacity: 0;
+      }
+
+      /* 展開時 */
+      .search.active input {
+        width: 220px;
+        opacity: 1;
+      }
+
+      .search .btn {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: #6200ea;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        color: #fff;
+        margin-left: -45px;
+        transition: background 0.3s ease, transform 0.4s ease;
+        font-size: 20px;
+      }
+
+      .search .btn:hover {
+        background: #8656de;
+      }
+
+      /* 點擊旋轉動畫 */
+      .search .btn.clicked {
+        transform: rotate(360deg);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="search">
+      <input type="text" placeholder="Search..." />
+      <div class="btn">🔍</div>
+    </div>
+
+    <script>
+      const search = document.querySelector(".search");
+      const btn = document.querySelector(".btn");
+
+      btn.onclick = () => {
+        search.classList.toggle("active");
+        btn.classList.add("clicked");
+
+        // 移除動畫 class，以便下次能重新觸發
+        setTimeout(() => {
+          btn.classList.remove("clicked");
+        }, 400);
+      };
+    </script>
+  </body>
+</html>

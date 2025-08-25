@@ -13,6 +13,15 @@
       href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='style.css') }}?v=20250821"
+    />
+    {% block extra_css %}{% endblock %}
   </head>
   <body>
     <div class="app-container">
@@ -21,74 +30,71 @@
 
       <main class="main-content">
         <header class="header">
-          <!--div class="header-left">
-            <img
-              src="{{ url_for('static', path='logo.png') }}"
-              alt="Logo"
-              class="logo"
-            />
-            <strong>OneTouch Portal</strong>
-          <div-->
-          <!-- 我們將原本右側的資訊移到這裡，並移除連結 -->
           {% if user %}
           <div class="header-user-info">
-            <!-- span>歡迎, {{ user }} ({{role}})</span-->
-            <span><strong>👋 歡迎回來, {{ user }}! 請從左側的功能列選擇您要使用的服務。</strong></span>
-            
-</p>
+            <span
+              ><strong
+                >👋 歡迎回來, {{ user }}!
+                請從左側的功能列選擇您要使用的服務。</strong
+              ></span
+            >
           </div>
           {% endif %}
         </header>
 
-        <div class="page-content">
-          <!-- 這裡是子模板內容的插入點 -->
-          {% block content %}{% endblock %}
-        </div>
+        <div class="page-content">{% block content %}{% endblock %}</div>
       </main>
     </div>
+
     <!-- ===== 更新後的 JavaScript 區塊 ===== -->
     <script>
       document.addEventListener("DOMContentLoaded", function () {
         const appContainer = document.querySelector(".app-container");
         const sidebarToggle = document.getElementById("sidebar-toggle");
 
-        // --- 子選單邏輯 (保留) ---
+        // --- 子選單邏輯：點新主選單時，其它自動收起 ---
         const submenuToggles = document.querySelectorAll(
           ".sidebar .has-submenu > a"
         );
         submenuToggles.forEach(function (toggle) {
           toggle.addEventListener("click", function (event) {
-            // 如果側邊欄是收合的，就不要執行子選單的展開動作
+            // 側邊欄若為收合狀態就不處理展開
             if (appContainer.classList.contains("sidebar-collapsed")) {
               return;
             }
             event.preventDefault();
             const parentLi = this.parentElement;
+
+            // 先把「其它」已展開的主選單收起來
+            document
+              .querySelectorAll(".sidebar .has-submenu.open")
+              .forEach(function (li) {
+                if (li !== parentLi) li.classList.remove("open");
+              });
+
+            // 再切換當前主選單
             parentLi.classList.toggle("open");
           });
         });
 
+        // 載入時若有子選單項目是 active，讓其父層預設展開
         const activeSubmenuLink = document.querySelector(".submenu a.active");
         if (activeSubmenuLink) {
           const parentSubmenu = activeSubmenuLink.closest(".has-submenu");
-          if (parentSubmenu) {
-            parentSubmenu.classList.add("open");
-          }
+          if (parentSubmenu) parentSubmenu.classList.add("open");
         }
 
-        // --- 側邊欄收合邏輯 (新增) ---
+        // --- 側邊欄收合邏輯（保留） ---
         if (sidebarToggle) {
-          // 1. 頁面載入時，檢查 localStorage 是否有已存的狀態
+          // 1) 載入時套用 localStorage 狀態
           if (localStorage.getItem("sidebarCollapsed") === "true") {
             appContainer.classList.add("sidebar-collapsed");
           }
-
-          // 2. 監聽按鈕點擊
+          // 2) 切換按鈕
           sidebarToggle.addEventListener("click", function (event) {
             event.preventDefault();
             appContainer.classList.toggle("sidebar-collapsed");
-
-            // 3. 將新狀態存入 localStorage
+            // 3) 存回狀態
             const isCollapsed =
               appContainer.classList.contains("sidebar-collapsed");
             localStorage.setItem("sidebarCollapsed", isCollapsed);

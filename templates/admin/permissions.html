@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}帳號權限管理 - {{ super() if super else "OneTouch" }}{% endblock %}
+{% block content %}
+<style>
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{border:1px solid #e5e7eb;padding:8px}
+.table th{background:#f9fafb;text-align:left;position:sticky;top:0}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06)}
+.controls{display:flex;gap:8px;align-items:center}
+</style>
+
+<div class="card">
+  <h2>🔐 帳號權限管理</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>帳號</th><th>名稱</th><th>角色</th><th>狀態</th>
+        {% for k in perm_keys %}<th>{{k}}</th>{% endfor %}
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in users %}
+      {% set u = row.u %}{% set perms = row.perms %}
+      <tr>
+        <form method="post" action="/admin/permissions/update" onsubmit="return packPerms(this, permKeys)">
+          <td><strong>{{u.loginname}}</strong>
+            <input type="hidden" name="user_id" value="{{u.id}}">
+            <input type="hidden" name="loginname" value="{{u.loginname}}">
+          </td>
+          <td>{{u.display_name or ""}}</td>
+          <td>
+            <select name="role_new">
+              <option value="admin"   {{ 'selected' if u.role=='admin' else '' }}>admin</option>
+              <option value="manager" {{ 'selected' if u.role=='manager' else '' }}>manager</option>
+              <option value="user"    {{ 'selected' if u.role=='user' else '' }}>user</option>
+              <option value="guest"   {{ 'selected' if u.role=='guest' else '' }}>guest</option>
+            </select>
+          </td>
+          <td>
+            <select name="status_new">
+              <option value="1" {{ 'selected' if u.status==1 else '' }}>啟用</option>
+              <option value="0" {{ 'selected' if u.status==0 else '' }}>停用</option>
+            </select>
+          </td>
+
+          {% for k in perm_keys %}
+          <td style="text-align:center">
+            <input type="checkbox" name="perm_{{k}}" value="1" {{ 'checked' if perms[k]==1 else '' }}>
+          </td>
+          {% endfor %}
+
+          <td class="controls">
+            <input type="hidden" name="perms_json">
+            <button type="submit">💾 儲存</button>
+        </form>
+        <form method="post" action="/admin/permissions/disable" style="display:inline">
+          <input type="hidden" name="user_id" value="{{u.id}}">
+          <input type="hidden" name="loginname" value="{{u.loginname}}">
+          <button type="submit" onclick="return confirm('確定停用？')">🛑 停用</button>
+        </form>
+          </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<script>
+const permKeys = {{ perm_keys|tojson }};
+</script>
+{% include "admin/_perm_pack_js.html" %}
+{% endblock %}

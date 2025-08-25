@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}出錯了 - {{ status_code }}｜{{ super() if super else 'OneTouch' }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .error-wrap {
+    min-height: calc(100vh - 120px);
+    display: grid;
+    place-items: center;
+    padding: 24px;
+    background: var(--bg, #f3f4f6);
+  }
+  .error-card {
+    background: #fff;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    max-width: 720px;
+    width: 100%;
+    padding: 24px;
+    text-align: center;
+  }
+  .error-head {
+    font-size: 20px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 4px;
+  }
+  .error-sub {
+    color: #6b7280;
+    margin-bottom: 16px;
+  }
+  .lottie-box {
+    width: 320px;
+    height: 180px;
+    margin: 0 auto 12px;
+  }
+  .error-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 12px;
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 8px 14px; border-radius: 10px; border: 1px solid #d1d5db;
+    background: #fff; font-weight: 600; cursor: pointer;
+  }
+  .btn.primary {
+    border-color: transparent; background: var(--primary, #2563eb); color: #fff;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, .25);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="error-wrap">
+  <div class="error-card">
+    <div class="error-head">發生錯誤（{{ status_code }}）</div>
+    <div class="error-sub">{{ message or '抱歉，頁面暫時無法顯示。' }}</div>
+
+    <!-- Lottie 動畫 -->
+    <div id="err-anim" class="lottie-box" aria-hidden="true"></div>
+
+    <div class="error-actions">
+      <button class="btn primary" id="btn-back">← 回上一頁</button>
+      <a class="btn primary" href="{{ home_url or '/' }}">回首頁</a>
+    </div>
+  </div>
+</div>
+
+<!-- Lottie：用 CDN 或改成本地端 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>
+<script>
+  (function(){
+    // 動畫路徑：二選一
+    // 1) 你有把檔名改成沒有空白（建議）：
+    var animPath = "{{ url_for('static', path='lottie/404-astronaut.json') }}";
+    // 2) 若仍然叫 404 Error.json，請改用這行（保留空白需編碼 %20）
+    // var animPath = "{{ url_for('static', path='lottie/404%20Error.json') }}";
+
+    var container = document.getElementById('err-anim');
+    if (container && window.lottie) {
+      lottie.loadAnimation({
+        container: container,
+        renderer: 'svg',
+        loop: true,
+        autoplay: true,
+        path: animPath
+      });
+    }
+
+    // 回上一頁：若沒有 history 則退回首頁
+    var back = document.getElementById('btn-back');
+    if (back) {
+      back.addEventListener('click', function(){
+        if (document.referrer && window.history.length > 1) {
+          history.back();
+        } else {
+          window.location.href = "{{ home_url or '/' }}";
+        }
+      });
+    }
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}群組權限 - {{ super() if super else "OneTouch" }}{% endblock %}
+{% block content %}
+<style>
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{border:1px solid #e5e7eb;padding:8px}
+.table th{background:#f9fafb;text-align:left;position:sticky;top:0}
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06);margin-bottom:16px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-block;padding:2px 8px;border:1px solid #e5e7eb;border-radius:999px;margin:2px}
+</style>
+
+<div class="card">
+  <h2>👥 群組清單</h2>
+  <form method="post" action="/admin/groups/add" class="controls">
+    新增群組：
+    <input name="name" placeholder="FrontDesk" required>
+    <input name="display_name" placeholder="顯示名稱">
+    <button type="submit">➕ 新增</button>
+  </form>
+</div>
+
+{% for row in groups %}
+{% set g = row.group %}{% set perms = row.perms %}
+<div class="card">
+  <h3>📦 {{ g.name }} <small>{{ g.display_name or "" }}</small></h3>
+
+  <form method="post" action="/admin/groups/update_perms" onsubmit="return packPerms(this, permKeys)">
+    <input type="hidden" name="group_id" value="{{ g.id }}">
+    <input type="hidden" name="group_name" value="{{ g.name }}">
+    <table class="table">
+      <thead>
+        <tr>{% for k in perm_keys %}<th>{{k}}</th>{% endfor %}<th>操作</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          {% for k in perm_keys %}
+          <td style="text-align:center">
+            <input type="checkbox" name="perm_{{k}}" value="1" {{ 'checked' if perms[k]==1 else '' }}>
+          </td>
+          {% endfor %}
+          <td>
+            <input type="hidden" name="perms_json">
+            <button type="submit">💾 儲存</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </form>
+
+  <h4>成員</h4>
+  <div class="controls">
+    {% for m in row.members %}
+      <span class="pill">{{ m.loginname }}
+        <form method="post" action="/admin/groups/remove_member" style="display:inline">
+          <input type="hidden" name="group_id" value="{{ g.id }}">
+          <input type="hidden" name="user_id" value="{{ m.id }}">
+          <button type="submit" title="移除">✖</button>
+        </form>
+      </span>
+    {% endfor %}
+  </div>
+
+  <form method="post" action="/admin/groups/add_member" class="controls">
+    <input type="hidden" name="group_id" value="{{ g.id }}">
+    <input name="loginname" placeholder="輸入 loginname 加入">
+    <button type="submit">➕ 加入成員</button>
+  </form>
+
+  <form method="post" action="/admin/groups/delete" class="controls" onsubmit="return confirm('刪除此群組？')">
+    <input type="hidden" name="group_id" value="{{ g.id }}">
+    <input type="hidden" name="group_name" value="{{ g.name }}">
+    <button type="submit">🗑 刪除群組</button>
+  </form>
+</div>
+{% endfor %}
+
+<script>
+const permKeys = {{ perm_keys|tojson }};
+</script>
+{% include "admin/_perm_pack_js.html" %}
+{% endblock %}

@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}簽核詳情 - {{ approval.subject }} · {{ super() if super else 'OneTouch' }}{% endblock %}
+{% block content %}
+<style>
+  .wrap{max-width:1100px;margin:auto;padding:12px}
+  .card{background:#fff;border:1px solid #e5e7eb;border-radius:14px;box-shadow:0 6px 20px rgba(0,0,0,.06);padding:16px;margin-bottom:12px}
+  .muted{color:#6b7280}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1 1 260px}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid #ddd;font-size:12px}
+  .ok{background:#ecfdf5}
+  .warn{background:#fffbeb}
+  .danger{background:#fee2e2}
+  table{width:100%;border-collapse:collapse}
+  th,td{border-bottom:1px solid #eee;padding:8px;text-align:left;vertical-align:top}
+  .btn{border:1px solid #2563eb;padding:10px 14px;border-radius:10px;cursor:pointer}
+  .btn.primary{background:#2563eb;color:#fff}
+  textarea,input[type="text"],select{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px}
+</style>
+{% if can_act %}
+  <div class="card" style="border-color:#86efac;background:#f0fdf4">
+    ✅ 你是 <strong>#{{ approval.current_step + 1 }}</strong> 關的簽核人，請完成簽核。
+  </div>
+{% else %}
+  {% if approval.status == 'pending' and approval.current_step >= 0 and current_step_obj %}
+  <div class="card" style="border-color:#fde68a;background:#fffbeb">
+    ⏳ 目前簽核人：<strong>{{ current_step_obj.approver_name }}</strong>（第 #{{ approval.current_step + 1 }} 關）
+  </div>
+  {% endif %}
+{% endif %}
+
+<div class="wrap">
+  <div class="card">
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <h2>📄 {{ approval.subject }}</h2>
+      <div>
+        {% if approval.status == 'approved' %}
+          <span class="badge ok">完成</span>
+        {% elif approval.status == 'rejected' %}
+          <span class="badge warn">退回</span>
+        {% else %}
+          <span class="badge">進行中</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="row">
+      <div class="col"><strong>送簽人：</strong>{{ approval.requester }}</div>
+      <div class="col"><strong>送簽部門：</strong>{{ approval.requester_dept or '-' }}</div>
+      <div class="col"><strong>送簽時間：</strong><span class="muted">{{ approval.submitted_at }}</span></div>
+      <div class="col"><strong>目前關卡：</strong>
+        {% if approval.current_step>=0 %}#{{ approval.current_step + 1 }}{% else %}-{% endif %}
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <strong>說明：</strong>
+      <div class="muted" style="white-space:pre-wrap">{{ approval.description or '（無）' }}</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🧭 串簽流程</h3>
+    <table>
+      <thead>
+        <tr><th style="width:70px">關卡</th><th>簽核人</th><th style="width:130px">狀態</th><th style="width:170px">處理時間</th><th>意見</th></tr>
+      </thead>
+      <tbody>
+        {% for s in steps %}
+        <tr {% if approval.current_step == s.step_order and s.status=='pending' %}style="background:#f9fafb"{% endif %}>
+          <td>#{{ s.step_order + 1 }}</td>
+          <td>{{ s.approver_name }} <div class="muted">{{ s.approver_email or '' }}</div></td>
+          <td>
+            {% if s.status == 'approved' %}<span class="badge ok">同意</span>
+            {% elif s.status == 'rejected' %}<span class="badge danger">退回</span>
+            {% else %}<span class="badge">待簽</span>{% endif %}
+          </td>
+          <td class="muted">{{ s.decided_at or '' }}</td>
+          <td style="white-space:pre-wrap">{{ s.comment or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if can_act %}
+    <form method="post" action="/approvals/{{ approval.id }}/action" style="margin-top:16px">
+      <label>簽核意見（可留空）</label>
+      <textarea name="comment" rows="4" placeholder="輸入給申請人或下一關的訊息…"></textarea>
+      <input type="hidden" name="action" id="actField" value="approve">
+      <div style="margin-top:10px;display:flex;gap:10px">
+        <button class="btn primary" onclick="document.getElementById('actField').value='approve'">✅ 同意</button>
+        <button class="btn" onclick="document.getElementById('actField').value='reject'">↩️ 退回</button>
+        <a href="/approvals" class="btn">返回清單</a>
+      </div>
+      <p class="muted" style="margin-top:6px">你是此單目前關卡的簽核人，處理後系統會自動通知下一關或申請人。</p>
+    </form>
+    {% else %}
+      <div style="margin-top:10px">
+        <a href="/approvals" class="btn">返回清單</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>🗂️ 歷程</h3>
+    {% if actions and actions|length>0 %}
+    <table>
+      <thead><tr><th style="width:160px">時間</th><th style="width:140px">動作者</th><th style="width:100px">動作</th><th>內容</th></tr></thead>
+      <tbody>
+        {% for a in actions %}
+        <tr>
+          <td class="muted">{{ a.created_at }}</td>
+          <td>{{ a.actor }}</td>
+          <td>{{ '送出' if a.action=='submit' else ('同意' if a.action=='approve' else ('退回' if a.action=='reject' else a.action)) }}</td>
+          <td style="white-space:pre-wrap">{{ a.note or '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted">尚無歷程。</p>
+    {% endif %}
+  </div>
+</div>
+<script>
+document.addEventListener('keydown', function(e){
+  const actField = document.getElementById('actField');
+  if(!actField) return; // 不是簽核者就沒有按鈕
+  if(e.key.toLowerCase()==='a'){ actField.value='approve'; document.querySelector('button.btn.primary')?.click(); }
+  if(e.key.toLowerCase()==='r'){ actField.value='reject';  document.querySelectorAll('button.btn')[1]?.click(); }
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Neomorphism Button (3D Active)</title>
+    <style>
+      body {
+        background: #f0f0f0; /* 白色系背景 */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        font-family: Arial, sans-serif;
+      }
+
+      button {
+        background: #f0f0f0;
+        border: none;
+        border-radius: 50px;
+        padding: 15px 40px;
+        font-size: 16px;
+        font-weight: bold;
+        color: #333;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        /* 預設：浮起來的效果 */
+        box-shadow: 6px 6px 12px #d1d1d1, -6px -6px 12px #ffffff;
+      }
+
+      button:hover {
+        /* hover 時更立體 */
+        box-shadow: 8px 8px 16px #d1d1d1, -8px -8px 16px #ffffff;
+      }
+
+      button:active {
+        /* 按下去 → 凹陷的效果 */
+        box-shadow: inset 6px 6px 12px #d1d1d1, inset -6px -6px 12px #ffffff;
+        transform: translateY(2px); /* 視覺上更真實 */
+      }
+    </style>
+  </head>
+  <body>
+    <button>BUTTON</button>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+<script>
+  function packPerms(form, keys) {
+    const data = {};
+    keys.forEach((k) => {
+      const el = form.querySelector(`input[name="perm_${k}"]`);
+      data[k] = el && el.checked ? 1 : 0;
+    });
+    form.querySelector('input[name="perms_json"]').value = JSON.stringify(data);
+    return true;
+  }
+</script>

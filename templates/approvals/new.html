@@ -1,0 +1,666 @@
+{% extends "base.html" %} {% block title %}建立簽核單 - {{ super() if super else
+'OneTouch' }}{% endblock %} {% block content %}
+<!-- Quill 樣式（Snow 題材） -->
+<link
+  href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css"
+  rel="stylesheet"
+/>
+
+<style>
+  :root {
+    --bg: #f3f4f6;
+    --card: #fff;
+    --text: #111827;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --bd: #e5e7eb;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+    padding: 16px;
+    max-width: 1100px;
+    margin: auto;
+  }
+  .row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .row .col {
+    flex: 1 1 280px;
+  }
+  label {
+    display: block;
+    margin: 0.25rem 0 0.25rem 2px;
+    color: #374151;
+  }
+  input[type="text"],
+  textarea,
+  select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid #d1d5db;
+    margin: 4px 6px 0 0;
+  }
+  /* 讓刪除鍵明顯：紅色、加粗、圓角、hover 有底色 */
+  .pill button {
+    margin-left: 6px;
+    border: 1px solid #fecaca;
+    background: #fff;
+    color: #dc2626;
+    font-weight: 700;
+    cursor: pointer;
+    border-radius: 999px;
+    width: 26px;
+    height: 26px;
+    line-height: 24px;
+    text-align: center;
+    padding: 0;
+  }
+  .pill button:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+  }
+  .btn {
+    border: 1px solid #2563eb;
+    padding: 10px 14px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .btn.primary {
+    background: #2563eb;
+    color: #fff;
+  }
+  .btn.ghost {
+    background: #fff;
+  }
+
+  /* Quill 容器微調（跟系統樣式和諧） */
+  .ql-container {
+    border-radius: 10px;
+  }
+  .ql-toolbar {
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+  }
+  .ql-container.ql-snow {
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+  }
+
+  /* ====== 搜尋 Modal（延用 callcenter 風格） ====== */
+  .toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin: 16px 0 0;
+  }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+  }
+  .modal {
+    width: min(1100px, 92vw);
+    max-height: 86vh;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid var(--bd);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--bd);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+  }
+  .modal-title {
+    font-weight: 700;
+  }
+  .modal-body {
+    padding: 12px 14px;
+    overflow: auto;
+  }
+  .modal-footer {
+    border-top: 1px solid var(--bd);
+    padding: 10px 14px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .searchbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+  }
+  .searchbar input[type="search"] {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--bd);
+    font-size: 14px;
+  }
+  .table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+    min-width: 900px;
+  }
+  .rowr {
+    background: #fff;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+  }
+  .rowr td {
+    padding: 8px;
+    border-bottom: 1px dashed #eee;
+    font-size: 14px;
+  }
+  .rowr td:last-child {
+    border-bottom: 0;
+  }
+  .table .pickbtn {
+    border: 1px solid #e5e7eb;
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  .table .pickbtn:hover {
+    background: #eef2ff;
+  }
+  /* 小尺寸按鈕：與 .btn 同風格，但更適合表格列 */
+  .btn.sm {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+  }
+  .btn.primary:hover {
+    filter: brightness(0.96);
+  }
+</style>
+
+<div class="card">
+  <h2>📝 建立簽核單</h2>
+  <form
+    method="post"
+    action="/approvals/create"
+    enctype="multipart/form-data"
+    onsubmit="return onSubmit()"
+  >
+    <div class="row">
+      <div class="col">
+        <label>送簽人</label>
+        <input type="text" name="requester" value="{{ user }}" required />
+      </div>
+      <div class="col">
+        <label>送簽部門</label>
+        <select id="req_dept" name="requester_dept">
+          <option value="">（可不選）</option>
+          {% for d in departments %}
+          <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <label>主旨</label>
+    <input type="text" name="subject" placeholder="請輸入主旨…" required />
+
+    <!-- ====== Quill：內容 ====== -->
+    <label style="margin-top: 8px">內容</label>
+    <div id="editor-toolbar">
+      <span class="ql-formats">
+        <select class="ql-header">
+          <option selected></option>
+          <option value="1"></option>
+          <option value="2"></option>
+          <option value="3"></option>
+        </select>
+        <select class="ql-font"></select>
+        <select class="ql-size"></select>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-bold"></button>
+        <button class="ql-italic"></button>
+        <button class="ql-underline"></button>
+        <button class="ql-strike"></button>
+        <select class="ql-color"></select>
+        <select class="ql-background"></select>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-list" value="ordered"></button>
+        <button class="ql-list" value="bullet"></button>
+        <button class="ql-blockquote"></button>
+        <button class="ql-code-block"></button>
+        <select class="ql-align"></select>
+      </span>
+      <span class="ql-formats">
+        <button class="ql-link"></button>
+        <button class="ql-image"></button>
+        <button class="ql-clean"></button>
+      </span>
+    </div>
+
+    <ul
+      id="filesList"
+      style="list-style: none; padding: 0; margin: 6px 0 0 0"
+    ></ul>
+
+    <div id="editor" style="height: 240px"></div>
+    <input type="hidden" name="description" id="description" />
+    <!-- ====== 附件（多檔） ====== -->
+    <label style="margin-top: 8px">附件</label>
+    <input id="files" name="files" type="file" multiple />
+    <div id="filesHint" class="muted" style="font-size: 12px; margin-top: 4px">
+      單檔上限 20 MB，合計上限 100 MB；支援常見文件/圖片。
+    </div>
+    <hr style="margin: 16px 0" />
+
+    <h3>👥 串簽人員（依序）</h3>
+    <div class="row">
+      <div class="col">
+        <label>選擇部門</label>
+        <select id="dept">
+          <option value="">-- 選擇部門 --</option>
+          {% for d in departments %}
+          <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col">
+        <label>選擇人員</label>
+        <select id="person">
+          <option value="">請先選部門</option>
+        </select>
+      </div>
+      <div
+        class="col"
+        style="align-self: flex-end; display: flex; gap: 8px; flex-wrap: wrap"
+      >
+        <button type="button" class="btn" onclick="addApprover()">
+          ➕ 加入
+        </button>
+        <button type="button" class="btn" id="openSearchBtn">
+          🔎 跨區搜尋
+        </button>
+      </div>
+    </div>
+
+    <div id="chain" style="margin-top: 8px"></div>
+    <input type="hidden" name="approver_chain" id="approver_chain" />
+
+    <div style="margin-top: 16px">
+      <button class="btn primary" type="submit">📤 送簽</button>
+      <a href="/approvals" class="btn">返回</a>
+    </div>
+  </form>
+</div>
+
+<!-- ====== 搜尋 Modal ====== -->
+<div class="modal-backdrop" id="searchModal">
+  <div
+    class="modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalTitle"
+  >
+    <div class="modal-header">
+      <div class="searchbar">
+        <strong class="modal-title" id="modalTitle">🔎 簽核人員跨區搜尋</strong>
+        <input
+          id="q"
+          type="search"
+          placeholder="輸入關鍵字（跨部門、姓名、英文名、email、分機…）"
+        />
+        <button class="btn primary" id="btnRecent" type="button">
+          最近50筆
+        </button>
+      </div>
+      <button
+        class="btn primary"
+        id="closeModal"
+        aria-label="Close"
+        type="button"
+      >
+        ✖
+      </button>
+    </div>
+    <div class="modal-body">
+      <div
+        style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px"
+      >
+        <span class="pill" style="border-radius: 8px"
+          >筆數 <strong id="counter" style="margin-left: 6px">0</strong></span
+        >
+      </div>
+      <div class="card" style="padding: 0; border: none; box-shadow: none">
+        <div class="table-wrap" style="overflow: auto">
+          <table class="table">
+            <thead id="thead"></thead>
+            <tbody id="list"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="closeModal2" type="button">關閉</button>
+    </div>
+  </div>
+</div>
+
+<!-- Quill 腳本 -->
+<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // 初始化 Quill
+  const quill = new Quill("#editor", {
+    theme: "snow",
+    placeholder: "請輸入內容…",
+    modules: { toolbar: "#editor-toolbar" },
+  });
+
+  let chain = [];
+  const HEADERS = [
+    "Department",
+    "Department_1",
+    "EnglishName",
+    "Name",
+    "Email",
+    "Ext",
+    "Pick",
+  ];
+  let CACHE_RECENT = [];
+
+  function onSubmit() {
+    const html = quill.root.innerHTML.trim();
+    const isEmpty = html === "<p><br></p>" || html === "";
+    $("description").value = isEmpty ? "" : html;
+
+    if (chain.length === 0) {
+      alert("請至少加入一位串簽人員");
+      return false;
+    }
+    $("approver_chain").value = JSON.stringify(chain);
+    return true;
+  }
+
+  function addApprover() {
+    const sel = $("person");
+    const val = sel.value;
+    if (!val) {
+      alert("請先選擇人員");
+      return;
+    }
+    chain.push(val);
+    renderChain();
+  }
+  function removeApprover(idx) {
+    chain.splice(idx, 1);
+    renderChain();
+  }
+  function renderChain() {
+    const box = $("chain");
+    box.innerHTML = "";
+    chain.forEach((name, i) => {
+      const el = document.createElement("span");
+      el.className = "pill";
+      el.innerHTML = `#${i + 1} ${name}
+        <button type="button" aria-label="移除" title="移除" onclick="removeApprover(${i})">✖</button>`;
+      box.appendChild(el);
+    });
+  }
+
+  $("dept").addEventListener("change", async (e) => {
+    const d = e.target.value;
+    const person = $("person");
+    person.innerHTML = `<option value="">載入中…</option>`;
+    if (!d) {
+      person.innerHTML = `<option value="">請先選部門</option>`;
+      return;
+    }
+    const res = await fetch(
+      `/approvals/approvers?dept=${encodeURIComponent(d)}`
+    );
+    const data = await res.json();
+    person.innerHTML = `<option value="">-- 選擇人員 --</option>`;
+    (data.names || []).forEach((n) => {
+      const op = document.createElement("option");
+      op.value = n;
+      op.textContent = n;
+      person.appendChild(op);
+    });
+  });
+
+  /* ========== 跨區搜尋（仿 callcenter） ========== */
+  function esc(s) {
+    return String(s || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function renderHeader() {
+    $("thead").innerHTML = `<tr>${HEADERS.map(
+      (h) => `<th style="text-align:left;padding:6px 8px">${esc(h)}</th>`
+    ).join("")}</tr>`;
+  }
+
+  function rowToLabel(r) {
+    const en = (r.EnglishName || "").trim();
+    const nm = (r.Name || "").trim();
+    return en && nm ? `${en} ${nm}` : en || nm;
+  }
+
+  function renderList(rows) {
+    const tb = $("list");
+    tb.innerHTML = "";
+    $("counter").textContent = rows.length;
+    rows.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.className = "rowr";
+      tr.innerHTML = `
+        <td>${esc(r.Department || "")}</td>
+        <td>${esc(r.Department_1 || "")}</td>
+        <td>${esc(r.EnglishName || "")}</td>
+        <td>${esc(r.Name || "")}</td>
+        <td>${esc(r.Email || "")}</td>
+        <td>${esc(r.Ext || "")}</td>
+        <td><button class="btn primary sm js-pick" type="button">➕ 加入</button>
+        </td>
+      `;
+      //tr.querySelector(".pickbtn").addEventListener("click", () => {
+      tr.querySelector(".js-pick").addEventListener("click", () => {
+        const label = rowToLabel(r);
+        if (!label) {
+          alert("此人缺少姓名資料");
+          return;
+        }
+        chain.push(label);
+        renderChain();
+        closeModal();
+      });
+      // 雙擊整列也可加入
+      tr.addEventListener("dblclick", () => {
+        const label = rowToLabel(r);
+        if (!label) {
+          return;
+        }
+        chain.push(label);
+        renderChain();
+        closeModal();
+      });
+      tb.appendChild(tr);
+    });
+  }
+
+  async function api_search(q = "") {
+    const url = `/approvals/api/approvers/search?limit=500&q=${encodeURIComponent(
+      q || ""
+    )}`;
+    const r = await fetch(url);
+    return r.json(); // [{Department,...}]
+  }
+
+  // 簡易 debounce
+  function debounce(fn, ms = 300) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), ms);
+    };
+  }
+
+  function openModal(loadRecent = true) {
+    $("searchModal").style.display = "flex";
+    document.body.style.overflow = "hidden";
+    if (loadRecent) {
+      if (CACHE_RECENT.length) {
+        renderList(CACHE_RECENT);
+      } else {
+        api_search("").then((rows) => {
+          CACHE_RECENT = rows;
+          renderList(rows);
+        });
+      }
+    }
+    $("q").focus();
+  }
+  function closeModal() {
+    $("searchModal").style.display = "none";
+    document.body.style.overflow = "";
+  }
+
+  // 事件
+  window.addEventListener("load", () => {
+    renderHeader();
+    $("openSearchBtn").addEventListener("click", () => openModal(true));
+    $("closeModal").addEventListener("click", closeModal);
+    $("closeModal2").addEventListener("click", closeModal);
+    $("searchModal").addEventListener("click", (e) => {
+      if (e.target === $("searchModal")) closeModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeModal();
+    });
+
+    $("q").addEventListener(
+      "input",
+      debounce(async (e) => {
+        const q = e.target.value.trim();
+        if (!q) {
+          renderList(CACHE_RECENT);
+          return;
+        }
+        const rows = await api_search(q);
+        renderList(rows);
+      }, 300)
+    );
+
+    $("btnRecent").addEventListener("click", async () => {
+      $("q").value = "";
+      CACHE_RECENT = await api_search("");
+      renderList(CACHE_RECENT);
+    });
+  });
+</script>
+<script>
+  // 大小限制（可自行調整）
+  const MAX_FILE_MB = 20; // 單檔 20MB
+  const MAX_TOTAL_MB = 100; // 合計 100MB
+  function fmt(n) {
+    return (n / 1024 / 1024).toFixed(2) + " MB";
+  }
+
+  // 選取檔案後，顯示清單 + 驗證大小
+  document.addEventListener("change", function (e) {
+    if (e.target && e.target.id === "files") {
+      const ul = document.getElementById("filesList");
+      ul.innerHTML = "";
+      const files = Array.from(e.target.files || []);
+      let total = 0;
+      files.forEach((f) => {
+        total += f.size || 0;
+        const li = document.createElement("li");
+        li.style.padding = "6px 8px";
+        li.style.border = "1px solid #e5e7eb";
+        li.style.borderRadius = "8px";
+        li.style.marginTop = "6px";
+        li.innerHTML = `${f.name} <span class="muted">(${fmt(
+          f.size || 0
+        )})</span>`;
+        if ((f.size || 0) > MAX_FILE_MB * 1024 * 1024) {
+          li.style.borderColor = "#fca5a5";
+          li.style.background = "#fef2f2";
+          li.innerHTML += ` <strong style="color:#b91c1c">超過單檔上限</strong>`;
+        }
+        ul.appendChild(li);
+      });
+      const hint = document.getElementById("filesHint");
+      hint.innerHTML = `單檔上限 20 MB，合計上限 100 MB；目前合計：<strong>${fmt(
+        total
+      )}</strong>`;
+      if (total > MAX_TOTAL_MB * 1024 * 1024) {
+        hint.style.color = "#b91c1c";
+      } else {
+        hint.style.color = "";
+      }
+    }
+  });
+
+  // 送出前把 Quill 內容塞到隱藏欄位，同時檢查附件大小
+  function onSubmit() {
+    const html = quill.root.innerHTML.trim();
+    const isEmpty = html === "<p><br></p>" || html === "";
+    document.getElementById("description").value = isEmpty ? "" : html;
+
+    // 檢查簽核鏈
+    if (chain.length === 0) {
+      alert("請至少加入一位串簽人員");
+      return false;
+    }
+    document.getElementById("approver_chain").value = JSON.stringify(chain);
+
+    // 檢查附件大小
+    const input = document.getElementById("files");
+    const files = Array.from(input.files || []);
+    let total = 0;
+    for (const f of files) {
+      if ((f.size || 0) > MAX_FILE_MB * 1024 * 1024) {
+        alert(`檔案「${f.name}」超過單檔 ${MAX_FILE_MB} MB 上限`);
+        return false;
+      }
+      total += f.size || 0;
+    }
+    if (total > MAX_TOTAL_MB * 1024 * 1024) {
+      alert(`附件合計超過 ${MAX_TOTAL_MB} MB 上限`);
+      return false;
+    }
+    return true;
+  }
+</script>
+
+{% endblock %}

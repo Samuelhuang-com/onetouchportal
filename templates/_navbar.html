@@ -1,35 +1,46 @@
 <!-- templates/_navbar.html -->
-<nav class="sidebar">
-  <!-- 將頂部和中間內容打包在一起 -->
+<nav class="sidebar" role="navigation" aria-label="主選單">
+  <!-- 頂部 + 主內容 -->
   <div class="sidebar-top-content">
-    <!-- 品牌標題區塊 -->
+    <!-- 品牌區 -->
     <div class="sidebar-brand">
       <img
         src="{{ url_for('static', path='logo.png') }}"
-        alt="Logo"
-        class="logo"
-      /><br />
-      <strong class="link-name">OneTouch Portal</strong>
+        alt="公司 Logo"
+        class="logo brand-logo"
+      />
+      <strong class="portal-name">OneTouch Portal</strong>
     </div>
 
-    <!-- 主要內容滾動區域 -->
+    <!-- 可滾動主體 -->
     <div class="sidebar-scrollable-content">
       <ul class="sidebar-links">
         {% for item in nav_items %} {% if not item.admin_only or
-        (item.admin_only and role == 'admin') %} {# 檢查是否有子選單 #} {% if
-        item.sub_items %}
+        (item.admin_only and role == 'admin') %} {% if item.sub_items %} {#
+        有子選單 #} {% set submenu_id = 'submenu-' ~ loop.index0 %}
         <li class="has-submenu">
-          <a href="#">
+          <!-- 這裡加上 title="{{ item.name }}" -->
+          <a
+            href="#"
+            class="submenu-toggle"
+            role="button"
+            aria-expanded="false"
+            aria-controls="{{ submenu_id }}"
+            title="{{ item.name }}"
+          >
             <span class="icon">{{ item.icon | safe }}</span>
             <span class="link-name">{{ item.name }}</span>
-            <span class="arrow"></span>
+            <span class="arrow" aria-hidden="true"></span>
           </a>
-          <ul class="submenu">
+          <ul class="submenu" id="{{ submenu_id }}">
             {% for sub_item in item.sub_items %}
             <li>
+              <!-- 這裡加上 title="{{ sub_item.name }}" -->
               <a
                 href="{{ sub_item.url }}"
                 class="{{ 'active' if sub_item.url == current_path else '' }}"
+                aria-current="{{ 'page' if sub_item.url == current_path else '' }}"
+                title="{{ sub_item.name }}"
               >
                 <span class="link-name">{{ sub_item.name }}</span>
               </a>
@@ -37,11 +48,15 @@
             {% endfor %}
           </ul>
         </li>
-        {% else %} {# 沒有子選單的普通項目 #}
+
+        {% else %} {# 沒子選單的普通項目 #}
         <li>
+          <!-- 這裡加上 title="{{ item.name }}" -->
           <a
             href="{{ item.url }}"
             class="{{ 'active' if item.url == current_path else '' }}"
+            aria-current="{{ 'page' if item.url == current_path else '' }}"
+            title="{{ item.name }}"
           >
             <span class="icon">{{ item.icon | safe }}</span>
             <span class="link-name">{{ item.name }}</span>
@@ -52,17 +67,16 @@
     </div>
   </div>
 
-  <!-- 頁尾連結, 會被推到最底部 -->
+  <!-- 頁尾 -->
   <div class="sidebar-footer">
-    <a href="/dashboard">
+    <a href="/dashboard" title="回首頁">
       <span class="icon">🏠</span>
       <span class="link-name">回首頁</span>
     </a>
-    <a href="/logout">
+    <a href="/logout" title="登出">
       <span class="icon">🚪</span>
       <span class="link-name">登出</span>
     </a>
-    <!-- 新增的收合按鈕 -->
     <a href="#" id="sidebar-toggle" title="收合選單">
       <span class="icon toggle-icon">↔️</span>
       <span class="link-name">收合選單</span>

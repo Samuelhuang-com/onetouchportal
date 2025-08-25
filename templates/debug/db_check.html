@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}DB 檢查 - {{ super() if super else "OneTouch" }}{% endblock %}
+{% block content %}
+<style>
+.card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(0,0,0,.06);margin-bottom:16px}
+.kv{display:grid;grid-template-columns:160px 1fr;gap:8px 16px;margin:12px 0}
+.table{width:100%;border-collapse:collapse;margin-top:10px}
+.table th,.table td{border:1px solid #e5e7eb;padding:8px;text-align:left}
+.table th{background:#f9fafb}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px}
+.ok{background:#dcfce7}
+.no{background:#fee2e2}
+.mono{font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace}
+.form{display:flex;gap:8px;align-items:center}
+.form input[type="text"]{padding:8px;border:1px solid #e5e7eb;border-radius:8px}
+.form button{padding:8px 12px;border:1px solid #d1d5db;border-radius:8px;background:#f3f4f6;cursor:pointer}
+.form small{color:#6b7280}
+.tag{display:inline-block;border:1px solid #e5e7eb;border-radius:999px;padding:2px 10px;margin-left:6px;font-size:12px}
+</style>
+
+<div class="card">
+  <h2>🩺 資料庫連線檢查（auth.db）</h2>
+  <div class="kv mono">
+    <div>DB 路徑</div><div>{{ db_path }}</div>
+    <div>檔案存在</div><div><span class="badge {{ 'ok' if db_exists else 'no' }}">{{ 'YES' if db_exists else 'NO' }}</span></div>
+    <div>檔案大小</div><div>{{ db_size }} bytes</div>
+    <div>users 筆數</div><div>{{ users_cnt }}</div>
+  </div>
+
+  <h3>樣本使用者（前 10 筆）</h3>
+  {% if sample_rows and sample_rows|length > 0 %}
+  <table class="table mono">
+    <thead>
+      <tr><th>id</th><th>loginname</th><th>role</th><th>status</th><th>updated_at</th></tr>
+    </thead>
+    <tbody>
+      {% for r in sample_rows %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.loginname }}</td>
+        <td>{{ r.role }}</td>
+        <td>{{ r.status }}</td>
+        <td>{{ r.updated_at }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="mono">（沒有資料或 users 表不存在）</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>🔎 查詢帳號權限</h2>
+  <form class="form" method="post" action="/debug/db-check">
+    <label>loginname：</label>
+    <input type="text" name="q" value="{{ query_login }}" placeholder="例如：samuel" required>
+    <button type="submit">查詢</button>
+    <small>admin 可查任何人；一般使用者僅能查自己。</small>
+  </form>
+
+  {% if query_result %}
+    <h3>結果</h3>
+    <div class="kv mono">
+      <div>loginname</div><div>{{ query_result.user.loginname }}</div>
+      <div>display_name</div><div>{{ query_result.user.display_name }}</div>
+      <div>role</div><div>{{ query_result.user.role }}</div>
+      <div>status</div><div>{{ query_result.user.status }}</div>
+      <div>updated_at</div><div>{{ query_result.user.updated_at }}</div>
+      <div>啟用權限數</div>
+      <div>{{ query_result.enabled_count }}
+        <span class="tag">總鍵數：{{ query_result.all_keys|length }}</span>
+      </div>
+    </div>
+
+    <table class="table mono">
+      <thead><tr><th>perm_key</th><th>on/off</th></tr></thead>
+      <tbody>
+        {% for k in query_result.all_keys %}
+        <tr>
+          <td>{{ k }}</td>
+          <td>{{ '1' if query_result.permissions[k]==1 else '0' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% elif query_login %}
+    <p class="mono">找不到使用者：{{ query_login }}</p>
+  {% endif %}
+</div>
+{% endblock %}

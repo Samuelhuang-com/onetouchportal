@@ -1,0 +1,401 @@
+{% extends "base.html" %} {% block title %}總機客服登記 - {{ super() if super
+else 'OneTouch' }}{% endblock %} {% block content %}
+<style>
+  :root {
+    --bg: #f3f4f6;
+    --card: #fff;
+    --text: #111827;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --bd: #e5e7eb;
+    --ok: #16a34a;
+    --warn: #f59e0b;
+    --danger: #dc2626;
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--bd);
+    border-radius: 14px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+    padding: 14px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 12px;
+  }
+  .field {
+    grid-column: span 4;
+    background: #fff;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .field label {
+    font-size: 12px;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .field input,
+  .field select,
+  .field textarea {
+    width: 100%;
+    border: 0;
+    outline: none;
+    font-size: 14px;
+    background: transparent;
+  }
+  .span-6 {
+    grid-column: span 6;
+  }
+  .span-12 {
+    grid-column: span 12;
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding-top: 8px;
+  }
+  .btn {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--bd);
+    background: #fff;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .btn.primary {
+    background: var(--primary);
+    color: #fff;
+    border-color: transparent;
+  }
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 16px 0;
+  }
+  .badge {
+    display: inline-block;
+    border: 1px solid var(--bd);
+    color: var(--muted);
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+  }
+  .table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 8px;
+  }
+  .row {
+    background: #fff;
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+  }
+  .row td {
+    padding: 8px;
+    border-bottom: 1px dashed #eee;
+    font-size: 14px;
+  }
+  .row td:last-child {
+    border-bottom: 0;
+  }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .ok {
+    color: var(--ok);
+  }
+  .warn {
+    color: var(--warn);
+  }
+  .danger {
+    color: var(--danger);
+  }
+</style>
+
+<div class="wrap">
+  <div class="header">
+    <h1>☎️ 總機客服登記</h1>
+    <span class="badge">OneTouch Portal</span>
+  </div>
+
+  <!-- 表單卡片 -->
+  <form id="ticketForm" class="card">
+    <div class="grid">
+      <div class="field">
+        <label>📅 日期</label
+        ><input id="date" name="date_" type="date" required />
+      </div>
+      <div class="field">
+        <label>🕘 接聽時間</label
+        ><input id="answer_time" name="answer_time" type="time" required />
+      </div>
+      <div class="field">
+        <label>📞 來源</label>
+        <select id="channel" name="channel" required></select>
+      </div>
+
+      <div class="field">
+        <label>👤 來電姓名</label
+        ><input
+          id="caller_name"
+          name="caller_name"
+          type="text"
+          placeholder="王小明"
+        />
+      </div>
+      <div class="field">
+        <label>📱 電話</label
+        ><input id="phone" name="phone" type="tel" placeholder="0912-345-678" />
+      </div>
+      <div class="field span-6">
+        <label>📝 訴求</label
+        ><textarea
+          id="issue"
+          name="issue"
+          required
+          placeholder="請簡述客人訴求…"
+        ></textarea>
+      </div>
+
+      <div class="field">
+        <label>🏢 轉接部門</label
+        ><select id="dept" name="dept"></select>
+      </div>
+      <div class="field">
+        <label>👥 轉接人員</label
+        ><select id="assignee" name="assignee">
+          <option value="">請先選部門</option>
+        </select>
+      </div>
+      <div class="field span-12">
+        <label>🧾 備註</label
+        ><textarea
+          id="note"
+          name="note"
+          placeholder="補充資訊、溝通重點…"
+        ></textarea>
+      </div>
+
+      <div class="field">
+        <label>📌 狀態</label
+        ><select id="status" name="status"></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" type="reset">清除</button>
+      <button class="btn primary" type="submit">送出</button>
+    </div>
+    <div class="hint">
+      Excel 檔會自動建立於 <code>data/callcenter_data.xlsx</code>（可用環境變數
+      <code>CALLCENTER_EXCEL_PATH</code> 覆寫）。
+    </div>
+  </form>
+
+  <!-- 清單卡片 -->
+  <div class="toolbar">
+    <div style="display: flex; gap: 8px; align-items: center">
+      <strong>最近 50 筆</strong><span class="badge" id="counter">0</span>
+    </div>
+    <input
+      id="q"
+      type="search"
+      placeholder="🔎 搜尋（跨所有欄位）"
+      style="
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid var(--bd);
+        min-width: 260px;
+      "
+    />
+  </div>
+
+  <div class="card">
+    <div class="table-wrap" style="overflow: auto">
+      <table class="table" style="min-width: 1100px">
+        <thead id="thead"></thead>
+        <tbody id="list"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let INIT = {
+    depts: [],
+    agentsByDept: {},
+    channels: [],
+    statuses: [],
+    headers: [],
+  };
+  let HEADERS = [];
+  let DATA = [];
+
+  function fillSelect(sel, items, placeholder) {
+    sel.innerHTML = "";
+    if (placeholder) {
+      const op = document.createElement("option");
+      op.value = "";
+      op.textContent = placeholder;
+      sel.appendChild(op);
+    }
+    (items || []).forEach((v) => {
+      const op = document.createElement("option");
+      op.value = v;
+      op.textContent = v;
+      sel.appendChild(op);
+    });
+  }
+
+  function renderHeader() {
+    const th = $("thead");
+    th.innerHTML =
+      `<tr>` + HEADERS.map((h) => `<th>${esc(h)}</th>`).join("") + `</tr>`;
+  }
+
+  function renderList(rows) {
+    const tb = $("list");
+    tb.innerHTML = "";
+    $("counter").textContent = rows.length;
+    rows.forEach((r) => {
+      const tr = document.createElement("tr");
+      tr.className = "row";
+      tr.innerHTML = HEADERS.map((h) => {
+        const v = r[h];
+        if (h === "Status") return `<td>${statusPill(v)}</td>`; // 仍保留狀態色標
+        return `<td>${esc(v)}</td>`;
+      }).join("");
+      tb.appendChild(tr);
+    });
+  }
+
+  function statusPill(s) {
+    const t = String(s || "").trim();
+    let cls = "";
+    if (t === "已完成") cls = "ok";
+    else if (t === "待回覆") cls = "warn";
+    else if (t === "已轉外部") cls = "danger";
+    return `<span class="${cls}">${esc(t)}</span>`;
+  }
+
+  function esc(s) {
+    return String(s || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  async function api(path) {
+    const r = await fetch(path);
+    return r.json();
+  }
+  async function api_init() {
+    return api("/callcenter/api/init");
+  }
+  async function api_list(q = "") {
+    return api(`/callcenter/api/list?limit=50&q=${encodeURIComponent(q)}`);
+  }
+
+  function onDeptChange() {
+    const dept = $("dept").value;
+    const names = (INIT.agentsByDept[dept] || []).map((a) => a);
+    fillSelect($("assignee"), names, "請選擇");
+  }
+
+  window.addEventListener("load", async () => {
+    // 預設今天
+    $("date").value = new Date().toISOString().slice(0, 10);
+
+    INIT = await api_init();
+    HEADERS = INIT.headers || [
+      "TicketID",
+      "Date",
+      "AnswerTime",
+      "CallerName",
+      "Phone",
+      "Issue",
+      "Dept",
+      "Assignee",
+      "Note",
+      "Channel",
+      "Status",
+      "CreatedAt",
+    ];
+    renderHeader();
+
+    fillSelect($("dept"), INIT.depts, "請選擇");
+    fillSelect($("channel"), INIT.channels, "請選擇");
+    fillSelect($("status"), INIT.statuses, "請選擇");
+    $("dept").addEventListener("change", onDeptChange);
+
+    DATA = await api_list();
+    renderList(DATA);
+
+    $("q").addEventListener("input", async (e) => {
+      const q = e.target.value.trim();
+      if (!q) {
+        renderList(DATA);
+        return;
+      }
+      const filtered = await api_list(q);
+      renderList(filtered);
+    });
+
+    document
+      .getElementById("ticketForm")
+      .addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const fd = new FormData(ev.currentTarget);
+        const required = [
+          ["date_", "請選日期"],
+          ["answer_time", "請選時間"],
+          ["channel", "請選來源"],
+          ["issue", "請填訴求"],
+        ];
+        for (const [k, msg] of required) {
+          if (!fd.get(k)) {
+            alert(msg);
+            return;
+          }
+        }
+        const res = await fetch("/callcenter/api/ticket", {
+          method: "POST",
+          body: fd,
+        });
+        const j = await res.json();
+        if (j.ok) {
+          alert("已送出！TicketID：" + j.ticketId);
+          ev.currentTarget.reset();
+          $("date").value = new Date().toISOString().slice(0, 10);
+          DATA = await api_list();
+          renderList(DATA);
+        } else {
+          alert("送出失敗：" + (j.error || ""));
+        }
+      });
+  });
+</script>
+{% endblock %}
