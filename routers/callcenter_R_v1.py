@@ -282,74 +282,33 @@ def api_ticket(
 
     return {"ok": True, "ticketId": ticket_id}
 
-# ---------- 列表／搜尋（支援分頁） ----------
+# ---------- 列表／搜尋 ----------
 @router.get("/api/list")
-def api_list(
-    q: str = "",
-    page: int = 1,
-    page_size: int = 50,
-):
-    """
-    - 預設回傳「最新第1頁、每頁50筆」。
-    - q 有值時：跨所有欄位 LIKE 查詢（整庫搜尋），並可分頁。
-    - 回傳 rows + 分頁資訊（total/page/pages/page_size），前端可做上一頁/下一頁。
-    """
+def api_list(limit: int = 50, q: str = ""):
     ensure_db()
+    limit = max(1, min(int(limit or 50), 500))
 
-    # 邊界處理
-    try:
-        page = max(1, int(page or 1))
-    except Exception:
-        page = 1
-    try:
-        page_size = max(1, min(int(page_size or 50), 500))
-    except Exception:
-        page_size = 50
-
-    base_where = ""
-    params: list = []
+    base_sql = "SELECT TicketID, Date, AnswerTime, CallerName, Phone, Issue, Dept, Assignee, Note, Channel, Status, CreatedAt FROM tickets"
+    params: List = []
 
     q = (q or "").strip()
     if q:
         like = f"%{q}%"
-        base_where = " WHERE " + " OR ".join([f"{col} LIKE ?" for col in HEADERS])
+        where = " WHERE " + " OR ".join([f"{col} LIKE ?" for col in HEADERS])
+        base_sql += where
         params.extend([like] * len(HEADERS))
 
-    # 先算總筆數（便於前端顯示分頁資訊）
-    count_sql = f"SELECT COUNT(1) AS cnt FROM tickets{base_where}"
-    with get_conn() as c:
-        total = c.execute(count_sql, params).fetchone()["cnt"]
-
-    # 取資料（最新在前）
-    offset = (page - 1) * page_size
-    data_sql = (
-        "SELECT TicketID, Date, AnswerTime, CallerName, Phone, Issue, Dept, "
-        "Assignee, Note, Channel, Status, CreatedAt "
-        "FROM tickets"
-        f"{base_where} "
-        "ORDER BY id DESC "
-        "LIMIT ? OFFSET ?"
-    )
-    data_params = params + [page_size, offset]
+    base_sql += " ORDER BY id DESC LIMIT ?"
+    params.append(limit)
 
     with get_conn() as c:
-        rows = c.execute(data_sql, data_params).fetchall()
+        rows = c.execute(base_sql, params).fetchall()
 
     dict_rows = []
     for r in rows:
         d = {HEADERS[i]: r[i] for i in range(len(HEADERS))}
         dict_rows.append(d)
-
-    pages = (total + page_size - 1) // page_size if total else 1
-    return {
-        "rows": dict_rows,
-        "total": total,
-        "page": page,
-        "pages": pages,
-        "page_size": page_size,
-        "query": q,
-    }
-
+    return dict_rows
 
 # ---------- AI 客戶端（可選） ----------
 def get_openai_client():

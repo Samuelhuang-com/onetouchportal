@@ -1,24 +1,27 @@
 # routers/approvals_router.py
 from fastapi import APIRouter, Request, Cookie, Form, Query, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
-from typing import Optional, List, Tuple, Set
+from typing import Optional, List, Tuple, Set, Dict, Any
 import sqlite3
 import os
-from datetime import datetime, timezone
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import smtplib
 from email.message import EmailMessage
 import json
 from pathlib import Path
 from uuid import uuid4
 import re
+import logging  # <-- 新增這一行
 
 from app_utils import get_base_context, templates
 
-# ========= 路徑與 DB 連線 =========
-# 以專案根為基準 <root>/data/approvals.db；可用環境變數 APPROVALS_DB 覆蓋
+# ========= 路徑與 DB =========
 BASE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_DB = BASE_DIR / "data" / "approvals.db"
 DB_PATH = os.getenv("APPROVALS_DB", str(DEFAULT_DB))
+
+TAIPEI = ZoneInfo("Asia/Taipei")
 
 router = APIRouter(prefix="/approvals", tags=["Approvals"])
 
@@ -26,7 +29,6 @@ UPLOAD_ROOT = BASE_DIR / "data" / "uploads" / "approvals"
 
 
 def _safe_filename(name: str) -> str:
-    """拿掉路徑、僅保留安全字元"""
     base = Path(str(name or "file")).name
     return re.sub(r"[^A-Za-z0-9._-]+", "_", base)
 
@@ -35,12 +37,97 @@ def get_conn():
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.row_factory = sqlite3.Row  # ✅ 允許用欄位名稱取值
     return conn
+
+
+# ========= 欄位/資料表自癒 =========
+def ensure_confidential_column():
+    with get_conn() as conn:
+        c = conn.cursor()
+        cols = [
+            r["name"].lower()
+            for r in c.execute("PRAGMA table_info(approvals)").fetchall()
+        ]
+        if "confidential" not in cols:
+            c.execute("ALTER TABLE approvals ADD COLUMN confidential TEXT")
+            conn.commit()
+
+
+def ensure_publish_memo_column():
+    with get_conn() as conn:
+        c = conn.cursor()
+        cols = [
+            r["name"].lower()
+            for r in c.execute("PRAGMA table_info(approvals)").fetchall()
+        ]
+        if "publish_memo" not in cols:
+            c.execute(
+                "ALTER TABLE approvals ADD COLUMN publish_memo INTEGER NOT NULL DEFAULT 0"
+            )
+            conn.commit()
+
+
+def ensure_view_scope_column():
+    with get_conn() as conn:
+        c = conn.cursor()
+        cols = [
+            r["name"].lower()
+            for r in c.execute("PRAGMA table_info(approvals)").fetchall()
+        ]
+        if "view_scope" not in cols:
+            c.execute(
+                "ALTER TABLE approvals ADD COLUMN view_scope TEXT NOT NULL DEFAULT 'restricted'"
+            )
+            conn.commit()
+
+
+def ensure_memos_table():
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute(
+            """
+            CREATE TABLE IF NOT EXISTS memos(
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                body TEXT,
+                visibility TEXT NOT NULL DEFAULT 'org',  -- org/restricted
+                created_at TEXT NOT NULL,
+                author TEXT,
+                source TEXT,
+                source_id INTEGER
+            )
+        """
+        )
+        conn.commit()
 
 
 # ========= 小工具 =========
 def now_iso():
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(TAIPEI).isoformat(timespec="seconds")
+
+
+def _format_taipei(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    s = str(value).strip()
+    if not s:
+        return ""
+    try:
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = datetime.fromisoformat(s)
+    except Exception:
+        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S"):
+            try:
+                dt = datetime.strptime(s, fmt)
+                return dt.strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                continue
+        return s
+    if dt.tzinfo is None:
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    return dt.astimezone(TAIPEI).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _combine_label(english_name: str, name: str) -> str:
@@ -56,31 +143,135 @@ def _norm(s: str) -> str:
 
 
 def _normi(s: str) -> str:
-    """大小寫不敏感 + 空白壓縮"""
     return _norm(s).casefold()
 
-# ====== 修復工具：重新編號 step_order，避免舊資料重覆 ======
+
+def _normalize_scope(raw_scope: Optional[str]) -> str:
+    scope = str(raw_scope or "restricted").strip().lower()
+    if scope in {"org", "restricted", "top_secret"}:
+        return scope
+    return "restricted"
+
+
+# ====== 修復工具：重新編號 step_order ======
 def _renumber_steps(approval_id: int):
     with get_conn() as conn:
         c = conn.cursor()
         rows = c.execute(
             "SELECT id FROM approval_steps WHERE approval_id=? ORDER BY step_order, id",
-            (approval_id,)
+            (approval_id,),
         ).fetchall()
-        for idx, (sid,) in enumerate(rows):
+        for idx, r in enumerate(rows):
+            sid = r["id"]
             c.execute("UPDATE approval_steps SET step_order=? WHERE id=?", (idx, sid))
         conn.commit()
+
 
 def _renumber_all_steps():
     with get_conn() as conn:
         c = conn.cursor()
         ids = c.execute("SELECT DISTINCT approval_id FROM approval_steps").fetchall()
-    for (aid,) in ids:
-        _renumber_steps(aid)
+    for r in ids:
+        _renumber_steps(r["approval_id"])
+
+
+def _log_action(conn, approval_id, actor, action, note="", step_id=None):
+    c = conn.cursor()
+    c.execute(
+        """
+        INSERT INTO approval_actions(approval_id, step_id, actor, action, note, created_at)
+        VALUES(?,?,?,?,?,?)
+        """,
+        (approval_id, step_id, actor, action, note, now_iso()),
+    )
+
+
+def _build_approval_snapshot(conn, approval_id):
+    c = conn.cursor()
+    row = c.execute(
+        """
+        SELECT id, subject, description, confidential, requester, requester_dept,
+               status, current_step, view_scope, publish_memo, submitted_at
+        FROM approvals WHERE id=?
+        """,
+        (approval_id,),
+    ).fetchone()
+    if not row:
+        return None
+
+    attachments = c.execute(
+        """
+        SELECT id, orig_name, stored_name, content_type, size_bytes, uploaded_by, uploaded_at
+        FROM approval_files
+        WHERE approval_id=?
+        ORDER BY id
+        """,
+        (approval_id,),
+    ).fetchall()
+
+    return {
+        "approval": {
+            "id": row["id"],
+            "subject": row["subject"],
+            "description": row["description"],
+            "confidential": row["confidential"],
+            "requester": row["requester"],
+            "requester_dept": row["requester_dept"],
+            "status": row["status"],
+            "current_step": row["current_step"],
+            "view_scope": row["view_scope"],
+            "publish_memo": row["publish_memo"],
+            "submitted_at": row["submitted_at"],
+        },
+        "attachments": [
+            {
+                "id": att["id"],
+                "name": att["orig_name"],
+                "stored": att["stored_name"],
+                "content_type": att["content_type"],
+                "size_bytes": att["size_bytes"],
+                "uploaded_by": att["uploaded_by"],
+                "uploaded_at": att["uploaded_at"],
+            }
+            for att in attachments
+        ],
+    }
+
+
+def _record_version(conn, approval_id, actor, change_type, detail=None):
+    snapshot = _build_approval_snapshot(conn, approval_id)
+    if not snapshot:
+        return
+
+    c = conn.cursor()
+    current = c.execute(
+        "SELECT COALESCE(MAX(version), 0) FROM approval_versions WHERE approval_id=?",
+        (approval_id,),
+    ).fetchone()
+    next_ver = (current[0] if current and current[0] is not None else 0) + 1
+
+    change_payload = {"type": change_type}
+    if detail:
+        change_payload["detail"] = detail
+
+    c.execute(
+        """
+        INSERT INTO approval_versions(approval_id, version, snapshot, changes, actor, created_at)
+        VALUES(?,?,?,?,?,?)
+        """,
+        (
+            approval_id,
+            next_ver,
+            json.dumps(snapshot, ensure_ascii=False),
+            json.dumps(change_payload, ensure_ascii=False),
+            actor,
+            now_iso(),
+        ),
+    )
+
 
 # ========= 建表（若不存在）=========
 def ensure_employees_table():
-    """確保 employees 表存在（不覆蓋既有資料）"""
     with get_conn() as conn:
         c = conn.cursor()
         c.execute(
@@ -105,7 +296,7 @@ def ensure_employees_table():
 
 
 def ensure_db():
-    """確保簽核相關表存在；建立前先自癒舊資料，避免索引建立失敗"""
+    """確保簽核相關表存在；建立前後做自癒，避免索引建立失敗"""
     with get_conn() as conn:
         c = conn.cursor()
         # 主表
@@ -115,11 +306,14 @@ def ensure_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             subject TEXT NOT NULL,
             description TEXT,
+            confidential TEXT,
             requester TEXT NOT NULL,
             requester_dept TEXT,
             submitted_at TEXT NOT NULL,
             status TEXT NOT NULL,          -- pending / approved / rejected
-            current_step INTEGER NOT NULL  -- 0-based；完成/退回為 -1
+            current_step INTEGER NOT NULL, -- 0-based；完成/退回為 -1
+            view_scope TEXT NOT NULL DEFAULT 'restricted',
+            publish_memo INTEGER NOT NULL DEFAULT 0
         )
         """
         )
@@ -151,11 +345,11 @@ def ensure_db():
             note TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY(approval_id) REFERENCES approvals(id) ON DELETE CASCADE,
-            FOREIGN KEY(step_id) REFERENCES approval_steps(id) ON DELETE SET NULL
+            FOREIGN KEY(step_id) REFERENCES approval_steps(id)
         )
         """
         )
-        # 附件（若你已經有就保留）
+        # 附件
         c.execute(
             """
         CREATE TABLE IF NOT EXISTS approval_files(
@@ -171,15 +365,35 @@ def ensure_db():
         )
         """
         )
+        # 版本紀錄
+        c.execute(
+            """
+        CREATE TABLE IF NOT EXISTS approval_versions(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            approval_id INTEGER NOT NULL,
+            version INTEGER NOT NULL,
+            snapshot TEXT NOT NULL,
+            changes TEXT,
+            actor TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(approval_id) REFERENCES approvals(id) ON DELETE CASCADE,
+            UNIQUE(approval_id, version)
+        )
+        """
+        )
         conn.commit()
 
-    # 先做一次全量自癒，處理舊資料的重覆序號
+    # 舊庫補欄位
+    ensure_view_scope_column()
+    ensure_confidential_column()
+    ensure_publish_memo_column()
+
+    # 自癒 + 索引
     try:
         _renumber_all_steps()
     except Exception as e:
         print("[approvals] renumber all steps failed:", e)
 
-    # 建立唯一索引；若因殘留資料又失敗，重跑自癒一次並略過
     try:
         with get_conn() as conn:
             c = conn.cursor()
@@ -191,7 +405,6 @@ def ensure_db():
             )
             conn.commit()
     except sqlite3.IntegrityError:
-        # 極少數情況：前一輪資料又變動造成碰撞，再自癒一次
         _renumber_all_steps()
         try:
             with get_conn() as conn:
@@ -200,17 +413,15 @@ def ensure_db():
                     """
                     CREATE UNIQUE INDEX IF NOT EXISTS ux_steps_order
                     ON approval_steps(approval_id, step_order)
-                    """
+                """
                 )
                 conn.commit()
         except sqlite3.IntegrityError as e:
-            # 若仍失敗，就先不建立索引（不影響功能），並輸出 log
             print("[approvals] WARN: create unique index failed after renumber:", e)
 
 
 # ========= 從 employees 取資料 =========
 def list_departments() -> List[str]:
-    """從 employees 的 department / department_1 擷取去重後的部門清單"""
     ensure_employees_table()
     try:
         with get_conn() as conn:
@@ -226,14 +437,13 @@ def list_departments() -> List[str]:
                 ORDER BY d
             """
             ).fetchall()
-        return [r[0] for r in rows]
+        return [r["d"] for r in rows]
     except Exception as e:
         print("[approvals] list_departments error:", e)
         return []
 
 
 def names_by_dept(dept: str) -> List[str]:
-    """依部門取人員，顯示為 english_name + name（任一缺省就用另一個）"""
     if not dept:
         return []
     ensure_employees_table()
@@ -253,7 +463,8 @@ def names_by_dept(dept: str) -> List[str]:
         return []
 
     seen, labels = set(), []
-    for en, nm in rows:
+    for r in rows:
+        en, nm = r["english_name"], r["name"]
         label = _combine_label(en, nm)
         if label and label not in seen:
             labels.append(label)
@@ -262,7 +473,6 @@ def names_by_dept(dept: str) -> List[str]:
 
 
 def _find_employee_by_display(display_name: str) -> Optional[Tuple[str, str, str]]:
-    """由顯示名稱（英文/中文/英+中）找出 (english_name, name, email)"""
     ensure_employees_table()
     target = _normi(display_name)
     if not target:
@@ -281,7 +491,8 @@ def _find_employee_by_display(display_name: str) -> Optional[Tuple[str, str, str
         print("[approvals] _find_employee_by_display error:", e)
         return None
 
-    for en, nm, mail in rows:
+    for r in rows:
+        en, nm, mail = r["english_name"], r["name"], r["email"]
         en_n = _normi(en)
         nm_n = _normi(nm)
         combo = _normi(_combine_label(en, nm))
@@ -299,9 +510,6 @@ def email_by_name(any_name: str) -> Optional[str]:
 
 
 def user_identity_keys(login_user: str) -> Set[str]:
-    """
-    產生此使用者可被接受的所有身分鍵：登入帳號 / 英文名 / 中文名 / 英+中 / email local-part
-    """
     keys: Set[str] = set()
     u = _normi(login_user)
     if u:
@@ -316,7 +524,8 @@ def user_identity_keys(login_user: str) -> Set[str]:
     except Exception:
         rows = []
 
-    for en, nm, mail in rows:
+    for r in rows:
+        en, nm, mail = r["english_name"], r["name"], r["email"]
         combo = _combine_label(en, nm)
         local = mail.split("@")[0] if mail else ""
         forms_n = {_normi(x) for x in [en, nm, combo, local] if x}
@@ -375,29 +584,47 @@ def _is_requester_or_admin(approval_id: int, user: str, role: Optional[str]) -> 
         r = conn.execute(
             "SELECT requester FROM approvals WHERE id=?", (approval_id,)
         ).fetchone()
-        return bool(r and r[0] == user)
+        return bool(r and r["requester"] == user)
 
 
-def _renumber_steps(approval_id: int):
-    """把此單所有關卡重新編號為 0..n-1（依 step_order,id 排序），避免序號重覆"""
+def _user_involved_in_approval(approval_id: int, user: str) -> bool:
+    keys = user_identity_keys(user)
     with get_conn() as conn:
         c = conn.cursor()
+        r = c.execute(
+            "SELECT requester FROM approvals WHERE id=?", (approval_id,)
+        ).fetchone()
+        if not r:
+            return False
+        if _normi(r["requester"]) in keys:
+            return True
         rows = c.execute(
-            "SELECT id FROM approval_steps WHERE approval_id=? ORDER BY step_order, id",
+            "SELECT approver_name FROM approval_steps WHERE approval_id=?",
             (approval_id,),
         ).fetchall()
-        for idx, (sid,) in enumerate(rows):
-            c.execute("UPDATE approval_steps SET step_order=? WHERE id=?", (idx, sid))
-        conn.commit()
+        for r2 in rows:
+            if _normi(r2["approver_name"]) in keys:
+                return True
+    return False
 
 
-def _renumber_all_steps():
-    """針對所有單據做一次序號重整；用於建立唯一索引前的『自癒』"""
+def can_view_approval(
+    approval_id: int, user: str, role: Optional[str], permissions: Optional[str]
+) -> bool:
+    if role == "admin":
+        return True
+    if not can_use_approvals(role, permissions):
+        return False
     with get_conn() as conn:
-        c = conn.cursor()
-        ids = c.execute("SELECT DISTINCT approval_id FROM approval_steps").fetchall()
-    for (aid,) in ids:
-        _renumber_steps(aid)
+        r = conn.execute(
+            "SELECT view_scope FROM approvals WHERE id=?", (approval_id,)
+        ).fetchone()
+        if not r:
+            return False
+        scope = (r["view_scope"] or "restricted").strip().lower()
+    if scope == "org":
+        return True
+    return _user_involved_in_approval(approval_id, user)
 
 
 # ========= 頁面：送簽表單 =========
@@ -432,11 +659,14 @@ async def create_approval(
     description: str = Form(""),
     requester: str = Form(...),
     requester_dept: str = Form(""),
-    approver_chain: str = Form(...),  # JSON：["Samuel Huang 黃金昇", "..."]
-    files: List[UploadFile] = File([]),  # 多檔附件
+    view_scope: str = Form("restricted"),  # org | restricted
+    approver_chain: str = Form(...),  # JSON：["A B", "..."]
+    files: List[UploadFile] = File([]),
     user: Optional[str] = Cookie(None),
     role: Optional[str] = Cookie(None),
     permissions: Optional[str] = Cookie(None),
+    confidential: str = Form(""),
+    publish_memo: str = Form("0"),  # ✅ 新增
 ):
     if not user:
         return RedirectResponse(url="/login")
@@ -456,14 +686,29 @@ async def create_approval(
             {"ok": False, "error": "請至少選擇一位串簽人員"}, status_code=400
         )
 
+    pm = 1 if str(publish_memo).strip().lower() in ("1", "true", "on", "yes") else 0
+
     with get_conn() as conn:
         c = conn.cursor()
         c.execute(
             """
-        INSERT INTO approvals(subject, description, requester, requester_dept, submitted_at, status, current_step)
-        VALUES(?,?,?,?,?,?,?)
-        """,
-            (subject, description, requester, requester_dept, now_iso(), "pending", 0),
+            INSERT INTO approvals(
+                subject, description, confidential, requester, requester_dept,
+                submitted_at, status, current_step, view_scope, publish_memo
+            ) VALUES(?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                subject,
+                description,
+                confidential,
+                requester,
+                requester_dept,
+                now_iso(),
+                "pending",
+                0,
+                _normalize_scope(view_scope),
+                pm,
+            ),
         )
         approval_id = c.lastrowid
 
@@ -475,7 +720,11 @@ async def create_approval(
                 save_name = nm or en or disp
                 save_mail = mail if ("@" in (mail or "")) else None
             else:
-                save_name = str(disp).strip()
+                save_name = (
+                    str(disp).trim()
+                    if hasattr(str(disp), "trim")
+                    else str(disp).strip()
+                )
                 save_mail = None
 
             c.execute(
@@ -514,9 +763,8 @@ async def create_approval(
                 fullpath = updir / stored
 
                 size = 0
-                # 分塊寫入
                 while True:
-                    chunk = await uf.read(1024 * 1024)  # 1MB
+                    chunk = await uf.read(1024 * 1024)
                     if not chunk:
                         break
                     with open(fullpath, "ab") as f:
@@ -541,6 +789,11 @@ async def create_approval(
                 )
             conn.commit()
 
+    with get_conn() as conn:
+        _record_version(
+            conn, approval_id, requester, "submit", {"note": "initial submission"}
+        )
+
     # 通知第一關
     with get_conn() as conn:
         c = conn.cursor()
@@ -551,7 +804,7 @@ async def create_approval(
         )
         row = c.fetchone()
         if row:
-            name, mail = row
+            name, mail = row["approver_name"], row["approver_email"]
             send_mail_safe(
                 [mail] if mail else [],
                 f"【簽核通知】請審核：{subject}",
@@ -594,15 +847,15 @@ async def list_page(
         rows = c.fetchall()
         my_todo = []
         for r in rows:
-            appr_name = r[5]
+            appr_name = r["approver_name"]
             if _normi(appr_name) in keys:
                 my_todo.append(
                     dict(
-                        id=r[0],
-                        subject=r[1],
-                        requester=r[2],
-                        submitted_at=r[3],
-                        step=r[4],
+                        id=r["id"],
+                        subject=r["subject"],
+                        requester=r["requester"],
+                        submitted_at=_format_taipei(r["submitted_at"]),
+                        step=r["step_order"],
                     )
                 )
 
@@ -617,7 +870,11 @@ async def list_page(
         )
         my_sent = [
             dict(
-                id=r[0], subject=r[1], status=r[2], submitted_at=r[3], current_step=r[4]
+                id=r["id"],
+                subject=r["subject"],
+                status=r["status"],
+                submitted_at=_format_taipei(r["submitted_at"]),
+                current_step=r["current_step"],
             )
             for r in c.fetchall()
         ]
@@ -625,8 +882,6 @@ async def list_page(
     ctx = get_base_context(request, user, role, permissions)
     ctx["my_todo"] = my_todo
     ctx["my_sent"] = my_sent
-    # ctx["attachments"] = attachments
-    ctx["role"] = role
     return templates.TemplateResponse("approvals/list.html", ctx)
 
 
@@ -645,7 +900,10 @@ async def detail_page(
         return RedirectResponse(url="/dashboard?error=permission_denied")
 
     ensure_db()
-    _renumber_steps(approval_id)  # ★ 自動整理序號，避免舊資料重覆
+    ensure_publish_memo_column()  # ✅ 保險：舊庫補欄位
+    if not can_view_approval(approval_id, user, role, permissions):
+        return HTMLResponse("你沒有權限檢視此簽核單。", status_code=403)
+    _renumber_steps(approval_id)
 
     with get_conn() as conn:
         c = conn.cursor()
@@ -653,8 +911,8 @@ async def detail_page(
         # 主檔
         c.execute(
             """
-            SELECT id, subject, description, requester, requester_dept,
-                   status, current_step, submitted_at
+            SELECT id, subject, description, confidential, requester, requester_dept,
+                   status, current_step, submitted_at, view_scope, publish_memo
             FROM approvals WHERE id=?
         """,
             (approval_id,),
@@ -663,14 +921,17 @@ async def detail_page(
         if not a:
             return HTMLResponse("Not found", status_code=404)
         approval = dict(
-            id=a[0],
-            subject=a[1],
-            description=a[2],
-            requester=a[3],
-            requester_dept=a[4],
-            status=a[5],
-            current_step=a[6],
-            submitted_at=a[7],
+            id=a["id"],
+            subject=a["subject"],
+            description=a["description"],
+            confidential=a["confidential"],
+            requester=a["requester"],
+            requester_dept=a["requester_dept"],
+            status=a["status"],
+            current_step=a["current_step"],
+            submitted_at=_format_taipei(a["submitted_at"]),
+            view_scope=_normalize_scope(a["view_scope"]),
+            publish_memo=int(a["publish_memo"] or 0),  # ✅ 提供前端顯示唯讀開關
         )
 
         # 關卡
@@ -684,13 +945,13 @@ async def detail_page(
         )
         steps = [
             dict(
-                id=r[0],
-                step_order=r[1],
-                approver_name=r[2],
-                approver_email=r[3],
-                status=r[4],
-                decided_at=r[5],
-                comment=r[6],
+                id=r["id"],
+                step_order=r["step_order"],
+                approver_name=r["approver_name"],
+                approver_email=r["approver_email"],
+                status=r["status"],
+                decided_at=_format_taipei(r["decided_at"]),
+                comment=r["comment"],
             )
             for r in c.fetchall()
         ]
@@ -698,16 +959,28 @@ async def detail_page(
         # 歷程
         c.execute(
             """
-            SELECT actor, action, note, created_at
+            SELECT actor, action, note, created_at, step_id
             FROM approval_actions
             WHERE approval_id=? ORDER BY id
         """,
             (approval_id,),
         )
         actions = [
-            dict(actor=r[0], action=r[1], note=r[2], created_at=r[3])
+            dict(
+                actor=r["actor"],
+                action=r["action"],
+                note=r["note"],
+                created_at=_format_taipei(r["created_at"]),
+                step_id=r["step_id"],
+            )
             for r in c.fetchall()
         ]
+        # 每個 step 最新一次動作（id 遞增 → 後者覆蓋前者）
+        latest_actions = {}
+        for a in actions:
+            sid = a.get("step_id")
+            if sid:
+                latest_actions[sid] = a["action"]
 
         # 附件
         c.execute(
@@ -720,7 +993,14 @@ async def detail_page(
             (approval_id,),
         )
         attachments = [
-            dict(id=r[0], name=r[1], ctype=r[2], size=r[3], by=r[4], at=r[5])
+            dict(
+                id=r["id"],
+                name=r["orig_name"],
+                ctype=r["content_type"],
+                size=r["size_bytes"],
+                by=r["uploaded_by"],
+                at=_format_taipei(r["uploaded_at"]),
+            )
             for r in c.fetchall()
         ]
 
@@ -736,27 +1016,46 @@ async def detail_page(
                     can_act = True
                 break
 
+    can_edit_content = approval["status"] == "pending" and (
+        (role == "admin") or (approval["requester"] == user)
+    )
+    user_involved = bool(user) and _user_involved_in_approval(approval_id, user)
+    scope_value = _normalize_scope(approval["view_scope"])
+    can_view_confidential = True
+    if scope_value == "org" and role != "admin" and not user_involved:
+        can_view_confidential = False
+    elif scope_value == "top_secret" and role != "admin" and not user_involved:
+        can_view_confidential = False
+
     ctx = get_base_context(request, user, role, permissions)
     ctx["approval"] = approval
     ctx["steps"] = steps
     ctx["actions"] = actions
+    ctx["latest_actions"] = latest_actions  # ← 新增這行
     ctx["can_act"] = can_act
     ctx["current_step_obj"] = cur_obj
     ctx["attachments"] = attachments
-    # ★ 詳情頁「新增串簽人員」需要的資料/權限
     ctx["departments"] = list_departments()
-    ctx["can_manage_chain"] = _is_requester_or_admin(approval_id, user, role) and (
-        approval["status"] == "pending"
+    ctx["can_manage_chain"] = can_edit_content
+    ctx["can_edit_content"] = can_edit_content
+    ctx["can_manage_attachments"] = can_edit_content
+    ctx["can_view_confidential"] = can_view_confidential
+    ctx["confidential_value"] = (
+        approval["confidential"] if can_view_confidential else ""
     )
+    ctx["role"] = role  # 給模板判斷 admin 按鈕
     return templates.TemplateResponse("approvals/detail.html", ctx)
 
 
-# ========= 簽核動作（同意 / 退回） =========
-@router.post("/{approval_id}/action")
-async def do_action(
+@router.post("/{approval_id}/edit")
+async def update_approval_details(
     approval_id: int,
-    action: str = Form(...),  # approve / reject
-    comment: str = Form(...),
+    subject: str = Form(...),
+    description: str = Form(""),
+    confidential: str = Form(""),
+    view_scope: str = Form("restricted"),
+    publish_memo: str = Form("0"),
+    requester_dept: str = Form(""),
     user: Optional[str] = Cookie(None),
     role: Optional[str] = Cookie(None),
     permissions: Optional[str] = Cookie(None),
@@ -767,24 +1066,294 @@ async def do_action(
         return RedirectResponse(url="/dashboard?error=permission_denied")
 
     ensure_db()
-    # 後端強制：簽核意見必填（去空白）
-    if not (comment or "").strip():
-        return RedirectResponse(
-            url=f"/approvals/{approval_id}?error=comment_required", status_code=303
-        )
-    comment = comment.strip()
 
     with get_conn() as conn:
         c = conn.cursor()
-        # 目前 step
+        row = c.execute(
+            """
+            SELECT subject, description, confidential, requester, status,
+                   view_scope, publish_memo, requester_dept
+            FROM approvals WHERE id=?
+            """,
+            (approval_id,),
+        ).fetchone()
+        if not row:
+            return HTMLResponse("Not found", status_code=404)
+
+        if row["status"] != "pending":
+            return RedirectResponse(
+                url=f"/approvals/{approval_id}?error=not_editable",
+                status_code=303,
+            )
+
+        if role != "admin" and row["requester"] != user:
+            return HTMLResponse("你沒有權限編輯此簽核單。", status_code=403)
+
+        normalized_view_scope = _normalize_scope(view_scope)
+        pm_value = (
+            1 if str(publish_memo).strip().lower() in ("1", "true", "on", "yes") else 0
+        )
+
+        changes = []
+        if row["subject"] != subject:
+            changes.append("主旨")
+        if (row["description"] or "") != description:
+            changes.append("說明")
+        if (row["confidential"] or "") != confidential:
+            changes.append("Confidential")
+        if row["view_scope"] != normalized_view_scope:
+            changes.append("可見範圍")
+        if int(row["publish_memo"] or 0) != pm_value:
+            changes.append("公告設定")
+        if (row["requester_dept"] or "") != requester_dept:
+            changes.append("申請人部門")
+
+        if not changes:
+            return RedirectResponse(url=f"/approvals/{approval_id}", status_code=303)
+
         c.execute(
-            "SELECT current_step, subject, description, requester FROM approvals WHERE id=?",
+            """
+            UPDATE approvals
+            SET subject=?, description=?, confidential=?, view_scope=?, publish_memo=?, requester_dept=?
+            WHERE id=?
+            """,
+            (
+                subject,
+                description,
+                confidential,
+                normalized_view_scope,
+                pm_value,
+                requester_dept,
+                approval_id,
+            ),
+        )
+        _log_action(
+            conn,
+            approval_id,
+            user,
+            "update_content",
+            f"更新內容：{', '.join(changes)}",
+        )
+        _record_version(
+            conn,
+            approval_id,
+            user,
+            "update_content",
+            {"fields": changes},
+        )
+
+    return RedirectResponse(url=f"/approvals/{approval_id}?ok=1", status_code=303)
+
+
+@router.post("/{approval_id}/attachments")
+async def add_approval_attachments(
+    approval_id: int,
+    files: List[UploadFile] = File([]),
+    user: Optional[str] = Cookie(None),
+    role: Optional[str] = Cookie(None),
+    permissions: Optional[str] = Cookie(None),
+):
+    if not user:
+        return RedirectResponse(url="/login")
+    if not can_use_approvals(role, permissions):
+        return RedirectResponse(url="/dashboard?error=permission_denied")
+
+    ensure_db()
+
+    valid_files = [f for f in (files or []) if f and f.filename]
+    if not valid_files:
+        return RedirectResponse(
+            url=f"/approvals/{approval_id}?error=no_files",
+            status_code=303,
+        )
+
+    UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    updir = UPLOAD_ROOT / str(approval_id)
+    updir.mkdir(parents=True, exist_ok=True)
+
+    added: List[str] = []
+
+    with get_conn() as conn:
+        c = conn.cursor()
+        row = c.execute(
+            "SELECT status, requester FROM approvals WHERE id=?",
+            (approval_id,),
+        ).fetchone()
+        if not row:
+            return HTMLResponse("Not found", status_code=404)
+        if row["status"] != "pending":
+            return RedirectResponse(
+                url=f"/approvals/{approval_id}?error=not_editable",
+                status_code=303,
+            )
+        if role != "admin" and row["requester"] != user:
+            return HTMLResponse("你沒有權限編輯附件。", status_code=403)
+
+        for uf in valid_files:
+            orig = _safe_filename(uf.filename)
+            ext = "".join(Path(orig).suffixes)
+            stored = f"{uuid4().hex}{ext}"
+            fullpath = updir / stored
+            size = 0
+            with open(fullpath, "wb") as fh:
+                while True:
+                    chunk = await uf.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    fh.write(chunk)
+                    size += len(chunk)
+            await uf.close()
+            c.execute(
+                """
+                INSERT INTO approval_files(approval_id, orig_name, stored_name, content_type, size_bytes, uploaded_by, uploaded_at)
+                VALUES(?,?,?,?,?,?,?)
+                """,
+                (
+                    approval_id,
+                    orig,
+                    stored,
+                    uf.content_type or "",
+                    size,
+                    user,
+                    now_iso(),
+                ),
+            )
+            added.append(orig)
+
+        if added:
+            _log_action(
+                conn,
+                approval_id,
+                user,
+                "add_attachment",
+                f"新增附件：{', '.join(added)}",
+            )
+            _record_version(
+                conn,
+                approval_id,
+                user,
+                "add_attachment",
+                {"files_added": added},
+            )
+
+    return RedirectResponse(url=f"/approvals/{approval_id}?ok=1", status_code=303)
+
+
+@router.post("/{approval_id}/attachments/{file_id}/delete")
+async def delete_approval_attachment(
+    approval_id: int,
+    file_id: int,
+    user: Optional[str] = Cookie(None),
+    role: Optional[str] = Cookie(None),
+    permissions: Optional[str] = Cookie(None),
+):
+    if not user:
+        return RedirectResponse(url="/login")
+    if not can_use_approvals(role, permissions):
+        return RedirectResponse(url="/dashboard?error=permission_denied")
+
+    ensure_db()
+
+    with get_conn() as conn:
+        c = conn.cursor()
+        row = c.execute(
+            "SELECT status, requester FROM approvals WHERE id=?",
+            (approval_id,),
+        ).fetchone()
+        if not row:
+            return HTMLResponse("Not found", status_code=404)
+        if row["status"] != "pending":
+            return RedirectResponse(
+                url=f"/approvals/{approval_id}?error=not_editable",
+                status_code=303,
+            )
+        if role != "admin" and row["requester"] != user:
+            return HTMLResponse("你沒有權限編輯附件。", status_code=403)
+
+        file_row = c.execute(
+            """
+            SELECT orig_name, stored_name
+            FROM approval_files
+            WHERE id=? AND approval_id=?
+            """,
+            (file_id, approval_id),
+        ).fetchone()
+        if not file_row:
+            return HTMLResponse("附件不存在。", status_code=404)
+
+        c.execute(
+            "DELETE FROM approval_files WHERE id=? AND approval_id=?",
+            (file_id, approval_id),
+        )
+
+        file_path = UPLOAD_ROOT / str(approval_id) / file_row["stored_name"]
+        if file_path.exists():
+            try:
+                file_path.unlink()
+            except Exception:
+                pass
+
+        removed = file_row["orig_name"]
+        _log_action(
+            conn,
+            approval_id,
+            user,
+            "delete_attachment",
+            f"刪除附件：{removed}",
+        )
+        _record_version(
+            conn,
+            approval_id,
+            user,
+            "delete_attachment",
+            {"files_removed": [removed]},
+        )
+
+    return RedirectResponse(url=f"/approvals/{approval_id}?ok=1", status_code=303)
+
+
+# ========= 簽核動作（同意 / 退回 / 知會） =========
+@router.post("/{approval_id}/action")
+async def do_action(
+    approval_id: int,
+    action: str = Form(...),  # approve / reject / ack(知會)
+    comment: str = Form(""),
+    user: Optional[str] = Cookie(None),
+    role: Optional[str] = Cookie(None),
+    permissions: Optional[str] = Cookie(None),
+):
+    if not user:
+        return RedirectResponse(url="/login")
+    if not can_use_approvals(role, permissions):
+        return RedirectResponse(url="/dashboard?error=permission_denied")
+
+    ensure_db()
+
+    # ack 可不填意見，預設寫「已知會」
+    is_ack = action == "ack"
+    if not is_ack and not (comment or "").strip():
+        return RedirectResponse(
+            url=f"/approvals/{approval_id}?error=comment_required", status_code=303
+        )
+    comment = (comment or "").strip() or ("已知會" if is_ack else "")
+
+    with get_conn() as conn:
+        c = conn.cursor()
+        # 目前 step + 主檔資訊（含 publish_memo）
+        c.execute(
+            "SELECT current_step, subject, description, requester, view_scope, publish_memo "
+            "FROM approvals WHERE id=?",
             (approval_id,),
         )
         row = c.fetchone()
         if not row:
             return HTMLResponse("Not found", status_code=404)
-        cur_step, subject, desc, requester = row
+        cur_step = row["current_step"]
+        subject = row["subject"]
+        desc = row["description"]
+        requester = row["requester"]
+        view_scope_v = row["view_scope"]
+        publish_memo_flag = int(row["publish_memo"] or 0)  # ← 你原本就有的欄位與邏輯
 
         # 當前 pending 關
         c.execute(
@@ -792,32 +1361,43 @@ async def do_action(
             SELECT id, approver_name, approver_email
             FROM approval_steps
             WHERE approval_id=? AND step_order=? AND status='pending'
-        """,
+            """,
             (approval_id, cur_step),
         )
         s = c.fetchone()
         if not s:
             return HTMLResponse("無可簽核的關卡（可能已被他人處理）", status_code=400)
-        step_id, approver_name, approver_email = s
+        step_id, approver_name, approver_email = (
+            s["id"],
+            s["approver_name"],
+            s["approver_email"],
+        )
 
-        # 身分授權（多身分鍵）
+        # 身分授權
         keys = user_identity_keys(user)
         if _normi(approver_name) not in keys:
             return HTMLResponse("您不是此關簽核人", status_code=403)
 
+        # 狀態決策：ack 與 approve 一樣視為通過；reject 照舊
+        if action in ("approve", "ack"):
+            new_status = "approved"
+        elif action == "reject":
+            new_status = "rejected"
+        else:
+            return HTMLResponse("不支援的動作", status_code=400)
+
         # 更新步驟狀態
-        new_status = "approved" if action == "approve" else "rejected"
         c.execute(
             """UPDATE approval_steps
-                     SET status=?, decided_at=?, comment=?
-                     WHERE id=?""",
+               SET status=?, decided_at=?, comment=?
+               WHERE id=?""",
             (new_status, now_iso(), comment, step_id),
         )
 
         # 歷程
         c.execute(
             """INSERT INTO approval_actions(approval_id, step_id, actor, action, note, created_at)
-                     VALUES(?,?,?,?,?,?)""",
+               VALUES(?,?,?,?,?,?)""",
             (approval_id, step_id, user, action, comment, now_iso()),
         )
 
@@ -836,15 +1416,14 @@ async def do_action(
             )
             return RedirectResponse(url=f"/approvals/{approval_id}", status_code=303)
 
-        # 同意 → 前進或完成
+        # 同意 / 知會 → 前進或完成（沿用你原本的推進與 memo 發佈）
         c.execute(
-            """SELECT COUNT(*) FROM approval_steps
-                     WHERE approval_id=?""",
+            "SELECT COUNT(*) AS cnt FROM approval_steps WHERE approval_id=?",
             (approval_id,),
         )
-        total_steps = c.fetchone()[0]
-
+        total_steps = c.fetchone()["cnt"]
         next_step = cur_step + 1
+
         if next_step >= total_steps:
             # 全部完成
             c.execute(
@@ -852,6 +1431,32 @@ async def do_action(
                 ("approved", -1, approval_id),
             )
             conn.commit()
+
+            # （保持與你現有一致）若開啟 publish_memo，發佈 Memo
+            if publish_memo_flag == 1:
+                ensure_memos_table()
+                with get_conn() as conn3:
+                    c3 = conn3.cursor()
+                    visibility = _normalize_scope(view_scope_v)
+                    if visibility == "top_secret":
+                        visibility = "restricted"
+                    c3.execute(
+                        """
+                        INSERT INTO memos(title, body, visibility, created_at, author, source, source_id)
+                        VALUES(?,?,?,?,?,?,?)
+                        """,
+                        (
+                            subject,
+                            desc,  # 直接帶「說明」
+                            visibility,  # org/restricted；top_secret 降到 restricted
+                            now_iso(),
+                            requester,
+                            "approvals",
+                            approval_id,
+                        ),
+                    )
+                    conn3.commit()
+
             # 通知申請人完成
             send_mail_safe(
                 [email_by_name(requester)] if email_by_name(requester) else [],
@@ -859,21 +1464,20 @@ async def do_action(
                 f"{requester} 您好：\n\n主旨：{subject}\n所有關卡已完成簽核。\n\n請登入系統查看。",
             )
         else:
-            # 前進下一關
+            # 推進下一關，並通知下一位簽核人
             c.execute(
                 "UPDATE approvals SET current_step=? WHERE id=?",
                 (next_step, approval_id),
             )
             conn.commit()
-            # 通知下一關
             c.execute(
                 """SELECT approver_name, approver_email FROM approval_steps
-                         WHERE approval_id=? AND step_order=?""",
+                   WHERE approval_id=? AND step_order=?""",
                 (approval_id, next_step),
             )
             nx = c.fetchone()
             if nx:
-                nx_name, nx_mail = nx
+                nx_name, nx_mail = nx["approver_name"], nx["approver_email"]
                 send_mail_safe(
                     [nx_mail] if nx_mail else [],
                     f"【簽核通知】請審核：{subject}",
@@ -883,7 +1487,7 @@ async def do_action(
     return RedirectResponse(url=f"/approvals/{approval_id}", status_code=303)
 
 
-# ========= 新增簽核人員（加入至最後一關，避免重覆名） =========
+# ========= 新增簽核人員 =========
 @router.post("/{approval_id}/steps/add")
 async def add_approver_step(
     approval_id: int,
@@ -927,17 +1531,17 @@ async def add_approver_step(
         ).fetchone()
         if not r:
             return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
-        if r[0] != "pending":
+        if r["status"] != "pending":
             return JSONResponse(
                 {"ok": False, "error": "approval_not_pending"}, status_code=400
             )
 
-        # 去重：同名不可再加入（大小寫/空白不敏感）
+        # 去重：同名不可再加入
         rows = c.execute(
             "SELECT approver_name FROM approval_steps WHERE approval_id=?",
             (approval_id,),
         ).fetchall()
-        names_n = {_normi(x[0]) for x in rows if x and x[0]}
+        names_n = {_normi(x["approver_name"]) for x in rows if x and x["approver_name"]}
         if _normi(save_name) in names_n:
             return JSONResponse(
                 {"ok": False, "error": "duplicated_name"}, status_code=400
@@ -945,10 +1549,10 @@ async def add_approver_step(
 
         # 取最後一關序號
         r = c.execute(
-            "SELECT MAX(step_order) FROM approval_steps WHERE approval_id=?",
+            "SELECT MAX(step_order) AS mx FROM approval_steps WHERE approval_id=?",
             (approval_id,),
         ).fetchone()
-        next_order = (int(r[0]) + 1) if (r and r[0] is not None) else 0
+        next_order = (int(r["mx"]) + 1) if (r and r["mx"] is not None) else 0
 
         # 寫入
         c.execute(
@@ -977,7 +1581,7 @@ async def add_approver_step(
     return JSONResponse({"ok": True})
 
 
-# ========= 重新排序（僅允許調整「目前關卡之後」且「未簽」的關卡） =========
+# ========= 重新排序 =========
 @router.post("/{approval_id}/steps/reorder")
 async def reorder_pending_steps(
     approval_id: int,
@@ -1003,6 +1607,8 @@ async def reorder_pending_steps(
     except Exception:
         return JSONResponse({"ok": False, "error": "bad_json"}, status_code=400)
 
+    SHIFT = 100000  # 避免唯一索引衝突的位移
+
     with get_conn() as conn:
         c = conn.cursor()
         r = c.execute(
@@ -1010,11 +1616,11 @@ async def reorder_pending_steps(
         ).fetchone()
         if not r:
             return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
-        if r[0] != "pending":
+        if r["status"] != "pending":
             return JSONResponse(
                 {"ok": False, "error": "approval_not_pending"}, status_code=400
             )
-        cur_step = int(r[1])
+        cur_step = int(r["current_step"])
 
         rows = c.execute(
             """SELECT id FROM approval_steps
@@ -1022,29 +1628,51 @@ async def reorder_pending_steps(
                ORDER BY step_order""",
             (approval_id, cur_step),
         ).fetchall()
-        allowed_ids = [rid for (rid,) in rows]
+        allowed_ids = [rid["id"] for rid in rows]
         if sorted(new_order_ids) != sorted(allowed_ids):
             return JSONResponse({"ok": False, "error": "invalid_ids"}, status_code=400)
 
-        next_order = cur_step + 1
-        for sid in new_order_ids:
-            c.execute(
-                "UPDATE approval_steps SET step_order=? WHERE id=? AND approval_id=?",
-                (next_order, sid, approval_id),
+        try:
+            c.execute("BEGIN")
+            # 1) 搬離
+            c.executemany(
+                "UPDATE approval_steps SET step_order = step_order + ? WHERE id=? AND approval_id=?",
+                [(SHIFT, sid, approval_id) for sid in allowed_ids],
             )
-            next_order += 1
-        c.execute(
-            """INSERT INTO approval_actions(approval_id, step_id, actor, action, note, created_at)
-                     VALUES(?,?,?,?,?,?)""",
-            (approval_id, None, user, "reorder_steps", "調整未簽關卡順序", now_iso()),
-        )
-        conn.commit()
+            # 2) 寫回
+            next_order = cur_step + 1
+            for sid in new_order_ids:
+                c.execute(
+                    "UPDATE approval_steps SET step_order=? WHERE id=? AND approval_id=?",
+                    (next_order, sid, approval_id),
+                )
+                next_order += 1
+
+            c.execute(
+                """INSERT INTO approval_actions(approval_id, step_id, actor, action, note, created_at)
+                   VALUES(?,?,?,?,?,?)""",
+                (
+                    approval_id,
+                    None,
+                    user,
+                    "reorder_steps",
+                    "調整未簽關卡順序",
+                    now_iso(),
+                ),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            conn.rollback()
+            _renumber_steps(approval_id)
+            return JSONResponse(
+                {"ok": False, "error": "integrity_conflict"}, status_code=409
+            )
 
     _renumber_steps(approval_id)
     return JSONResponse({"ok": True})
 
 
-# ========= Debug（admin） =========
+# ========= Debug =========
 @router.get("/debug/ping")
 async def debug_ping(
     request: Request,
@@ -1057,7 +1685,7 @@ async def debug_ping(
     if role != "admin":
         return JSONResponse({"error": "admin only"}, status_code=403)
 
-    info = {}
+    info: Dict[str, Any] = {}
     try:
         db_file = Path(DB_PATH)
         info["db_path"] = str(db_file)
@@ -1075,8 +1703,8 @@ async def debug_ping(
             c = conn.cursor()
             try:
                 info["employees_count"] = c.execute(
-                    "SELECT COUNT(*) FROM employees"
-                ).fetchone()[0]
+                    "SELECT COUNT(*) AS c FROM employees"
+                ).fetchone()["c"]
             except sqlite3.OperationalError as e:
                 info["employees_table_error"] = str(e)
                 info["employees_count"] = None
@@ -1085,68 +1713,6 @@ async def debug_ping(
 
     return JSONResponse(info)
 
-@router.post("/debug/build_step_index")
-async def debug_build_step_index(
-    user: Optional[str] = Cookie(None),
-    role: Optional[str] = Cookie(None),
-):
-    if not user:
-        return RedirectResponse(url="/login")
-    if role != "admin":
-        return JSONResponse({"ok": False, "error": "admin only"}, status_code=403)
-
-    # 先修復舊資料 → 再建立唯一索引
-    ensure_db()
-    _renumber_all_steps()
-    created = False
-    try:
-        with get_conn() as conn:
-            c = conn.cursor()
-            c.execute("""
-                CREATE UNIQUE INDEX IF NOT EXISTS ux_steps_order
-                ON approval_steps(approval_id, step_order)
-            """)
-            conn.commit()
-            created = True
-    except sqlite3.IntegrityError:
-        # 若仍有殘留，重跑修復再試一次；若再失敗就放過（功能不受影響）
-        _renumber_all_steps()
-        try:
-            with get_conn() as conn:
-                c = conn.cursor()
-                c.execute("""
-                    CREATE UNIQUE INDEX IF NOT EXISTS ux_steps_order
-                    ON approval_steps(approval_id, step_order)
-                """)
-                conn.commit()
-                created = True
-        except sqlite3.IntegrityError:
-            pass
-
-    return JSONResponse({
-        "ok": True,
-        "msg": "步驟序號已重整，索引已建立/確認存在。" if created else "步驟序號已重整（索引原本就存在）。"
-    })
-
-@router.post("/debug/build_employee_indexes")
-async def debug_build_employee_indexes(
-    user: Optional[str] = Cookie(None),
-    role: Optional[str] = Cookie(None),
-):
-    if not user:
-        return RedirectResponse(url="/login")
-    if role != "admin":
-        return JSONResponse({"ok": False, "error": "admin only"}, status_code=403)
-
-    ensure_employees_table()
-    with get_conn() as conn:
-        c = conn.cursor()
-        c.execute("CREATE INDEX IF NOT EXISTS idx_emp_dept   ON employees(department)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_emp_dept1  ON employees(department_1)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_emp_name   ON employees(name)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_emp_en     ON employees(english_name)")
-        conn.commit()
-    return {"ok": True, "msg": "員工索引建立完成"}
 
 @router.get("/debug/dept")
 async def debug_dept(
@@ -1214,15 +1780,15 @@ async def api_search_approvers(
             ).fetchall()
 
     results = []
-    for d, d1, en, nm, mail, ext in rows:
+    for r in rows:
         results.append(
             {
-                "Department": d or "",
-                "Department_1": d1 or "",
-                "EnglishName": en or "",
-                "Name": nm or "",
-                "Email": mail or "",
-                "Ext": ext or "",
+                "Department": r["department"] or "",
+                "Department_1": r["department_1"] or "",
+                "EnglishName": r["english_name"] or "",
+                "Name": r["name"] or "",
+                "Email": r["email"] or "",
+                "Ext": r["extension_number"] or "",
             }
         )
     return results
@@ -1230,7 +1796,6 @@ async def api_search_approvers(
 
 @router.post("/debug/create_indexes")
 async def debug_create_indexes(
-    request: Request,
     user: Optional[str] = Cookie(None),
     role: Optional[str] = Cookie(None),
 ):
@@ -1279,7 +1844,8 @@ async def api_search(
 
     base_sql = """
         SELECT a.id, a.subject, a.description, a.requester, a.status, a.current_step, a.submitted_at,
-               s.approver_name AS cur_approver_name, s.status AS cur_step_status
+               s.approver_name AS cur_approver_name, s.status AS cur_step_status,
+               a.view_scope
         FROM approvals a
         LEFT JOIN approval_steps s
           ON a.id = s.approval_id AND a.current_step = s.step_order
@@ -1299,16 +1865,16 @@ async def api_search(
         like = f"%{q}%"
         cond.append(
             """(
-            a.subject LIKE ? COLLATE NOCASE
-            OR a.description LIKE ? COLLATE NOCASE
-            OR a.requester LIKE ? COLLATE NOCASE
-            OR EXISTS (
-                SELECT 1 FROM approval_steps s2
-                WHERE s2.approval_id = a.id
-                  AND (s2.approver_name LIKE ? COLLATE NOCASE
-                       OR s2.approver_email LIKE ? COLLATE NOCASE)
-            )
-        )"""
+                a.subject LIKE ? COLLATE NOCASE
+             OR a.description LIKE ? COLLATE NOCASE
+             OR a.requester LIKE ? COLLATE NOCASE
+             OR EXISTS (
+                    SELECT 1 FROM approval_steps s2
+                    WHERE s2.approval_id = a.id
+                      AND (s2.approver_name LIKE ? COLLATE NOCASE
+                           OR s2.approver_email LIKE ? COLLATE NOCASE)
+                )
+            )"""
         )
         params += [like, like, like, like, like]
     if scope == "mine":
@@ -1323,17 +1889,19 @@ async def api_search(
         rows = conn.execute(sql, params).fetchall()
 
     results = []
-    for (
-        rid,
-        subject,
-        desc,
-        requester,
-        a_status,
-        cur_step,
-        submitted_at,
-        cur_name,
-        cur_step_status,
-    ) in rows:
+    for r in rows:
+        rid = r["id"]
+        subject = r["subject"] or ""
+        desc = r["description"] or ""
+        requester = r["requester"] or ""
+        a_status = r["status"]
+        cur_step = r["current_step"]
+        submitted_at = _format_taipei(r["submitted_at"])
+        cur_name = r["cur_approver_name"]
+        cur_step_status = r["cur_step_status"]
+        scope_value = _normalize_scope(r["view_scope"])
+
+        # scope=todo：僅列本人待簽
         if scope == "todo":
             if not (
                 a_status == "pending"
@@ -1342,19 +1910,31 @@ async def api_search(
             ):
                 continue
 
+        try:
+            can_view = can_view_approval(rid, user, role, permissions)
+        except Exception:
+            can_view = False
+
+        if scope_value == "top_secret" and not can_view:
+            # 極機密：未被授權者看不到搜尋結果
+            continue
+
         preview = _strip_html(desc)[:120]
         step_disp = (cur_step + 1) if (cur_step is not None and cur_step >= 0) else None
+
         results.append(
             {
                 "id": rid,
-                "subject": subject or "",
-                "requester": requester or "",
+                "subject": subject,
+                "requester": requester,
                 "status": a_status,
                 "current_step": step_disp,
-                "submitted_at": submitted_at or "",
+                "submitted_at": submitted_at,
                 "preview": preview,
+                "can_view": bool(can_view),  # <=== 給前端用
             }
         )
+
     return results
 
 
@@ -1384,7 +1964,7 @@ async def download_file(
         row = c.fetchone()
         if not row:
             return HTMLResponse("File not found", status_code=404)
-        orig, stored, ctype = row
+        orig, stored, ctype = row["orig_name"], row["stored_name"], row["content_type"]
 
     path = UPLOAD_ROOT / str(approval_id) / stored
     if not path.exists():
@@ -1396,14 +1976,212 @@ async def download_file(
         filename=orig,
     )
 
-@router.post("/debug/renumber_all")
-async def debug_renumber_all(
+
+@router.post("/debug/build_step_index")
+async def debug_build_step_index(
     user: Optional[str] = Cookie(None),
     role: Optional[str] = Cookie(None),
 ):
     if not user:
         return RedirectResponse(url="/login")
     if role != "admin":
-        return JSONResponse({"error": "admin only"}, status_code=403)
+        return JSONResponse({"ok": False, "error": "admin only"}, status_code=403)
+
+    ensure_db()
     _renumber_all_steps()
-    return {"ok": True}
+    created = False
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS ux_steps_order
+                ON approval_steps(approval_id, step_order)
+            """
+            )
+            conn.commit()
+            created = True
+    except sqlite3.IntegrityError:
+        _renumber_all_steps()
+        try:
+            with get_conn() as conn:
+                c = conn.cursor()
+                c.execute(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS ux_steps_order
+                    ON approval_steps(approval_id, step_order)
+                """
+                )
+                conn.commit()
+                created = True
+        except sqlite3.IntegrityError:
+            pass
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "msg": (
+                "步驟序號已重整，索引已建立/確認存在。"
+                if created
+                else "步驟序號已重整（索引原本就存在）。"
+            ),
+        }
+    )
+
+
+@router.post("/debug/build_employee_indexes")
+async def debug_build_employee_indexes(
+    user: Optional[str] = Cookie(None),
+    role: Optional[str] = Cookie(None),
+):
+    if not user:
+        return RedirectResponse(url="/login")
+    if role != "admin":
+        return JSONResponse({"ok": False, "error": "admin only"}, status_code=403)
+
+    ensure_employees_table()
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute("CREATE INDEX IF NOT EXISTS idx_emp_dept ON employees(department)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_emp_dept1 ON employees(department_1)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_emp_name ON employees(name)")
+        c.execute("CREATE INDEX IF NOT EXISTS idx_emp_en ON employees(english_name)")
+        conn.commit()
+    return {"ok": True, "msg": "員工索引建立完成"}
+
+
+# ========= 刪除簽核關卡（僅允許 pending 且在目前關卡之後） =========
+# routers/approvals_router.py
+# ... (rest of the file remains the same)
+
+
+# ========= 刪除簽核關卡（僅允許 pending 且在目前關卡之後） =========
+@router.delete("/{approval_id}/steps/{step_id}/delete", status_code=200)
+@router.post("/{approval_id}/steps/{step_id}/delete")
+async def delete_approver_step(
+    approval_id: int,
+    step_id: int,
+    user: Optional[str] = Cookie(None),
+    role: Optional[str] = Cookie(None),
+    permissions: Optional[str] = Cookie(None),
+):
+    logging.info(
+        f"== Starting DELETE request for step {step_id} in approval {approval_id} =="
+    )
+
+    if not user:
+        logging.warning("User not authenticated.")
+        return RedirectResponse(url="/login")
+    if not can_use_approvals(role, permissions):
+        logging.warning(f"Permission denied for user {user}.")
+        return JSONResponse(
+            {"ok": False, "error": "permission_denied"}, status_code=403
+        )
+    if not _is_requester_or_admin(approval_id, user, role):
+        logging.warning(f"User {user} is not requester or admin.")
+        return JSONResponse(
+            {"ok": False, "error": "only_requester_or_admin"}, status_code=403
+        )
+
+    ensure_db()
+    try:
+        with get_conn() as conn:
+            c = conn.cursor()
+
+            # Step 1: Check approval status
+            logging.info("Checking approval status...")
+            r = c.execute(
+                "SELECT status, current_step FROM approvals WHERE id=?", (approval_id,)
+            ).fetchone()
+            if not r:
+                logging.error(f"Approval {approval_id} not found. Returning 404.")
+                return JSONResponse(
+                    {"ok": False, "error": "not_found"}, status_code=404
+                )
+            if r["status"] != "pending":
+                logging.warning(
+                    f"Approval {approval_id} is not pending. Status: {r['status']}. Returning 400."
+                )
+                return JSONResponse(
+                    {"ok": False, "error": "approval_not_pending"}, status_code=400
+                )
+            cur_step = int(r["current_step"])
+
+            # Step 2: Check if the step exists and can be deleted
+            logging.info(f"Checking step {step_id} status...")
+            s = c.execute(
+                """SELECT id, step_order, status, approver_name
+                             FROM approval_steps WHERE id=? AND approval_id=?""",
+                (step_id, approval_id),
+            ).fetchone()
+            if not s:
+                logging.error(
+                    f"Step {step_id} not found for approval {approval_id}. Returning 404."
+                )
+                return JSONResponse(
+                    {"ok": False, "error": "step_not_found"}, status_code=404
+                )
+            if s["status"] != "pending" or int(s["step_order"]) <= cur_step:
+                logging.warning(
+                    f"Cannot delete step {step_id} (status: {s['status']}, order: {s['step_order']}). Returning 400."
+                )
+                return JSONResponse(
+                    {"ok": False, "error": "cannot_delete_this_step"}, status_code=400
+                )
+
+            # Step 3: Execute deletion by temporarily disabling foreign key checks
+            logging.info("Disabling foreign key checks to prevent integrity errors...")
+            c.execute("PRAGMA foreign_keys = OFF")
+
+            logging.info("Starting database transaction...")
+            conn.execute("BEGIN TRANSACTION")
+
+            # 3a: Delete related records from approval_actions
+            logging.info(
+                f"Deleting related records from approval_actions for step {step_id}..."
+            )
+            c.execute(
+                """DELETE FROM approval_actions WHERE approval_id = ? AND step_id = ?""",
+                (approval_id, step_id),
+            )
+
+            # 3b: Delete the record from approval_steps
+            logging.info(f"Deleting record from approval_steps for id {step_id}...")
+            c.execute("DELETE FROM approval_steps WHERE id=?", (step_id,))
+
+            # 3c: Insert the new action log
+            logging.info("Inserting new action log...")
+            c.execute(
+                """INSERT INTO approval_actions(approval_id, step_id, actor, action, note, created_at)
+                             VALUES(?,?,?,?,?,?)""",
+                (
+                    approval_id,
+                    step_id,
+                    user,
+                    "delete_step",
+                    f"刪除簽核人：{s['approver_name']}",
+                    now_iso(),
+                ),
+            )
+
+            conn.commit()
+            logging.info("Transaction committed successfully. Deletion complete.")
+
+    except Exception as e:
+        conn.rollback()
+        logging.error(
+            f"An unexpected error occurred during delete: {e}. Rolling back transaction."
+        )
+        return JSONResponse({"ok": False, "error": "database_error"}, status_code=500)
+    finally:
+        # Step 4: Always re-enable foreign key checks
+        logging.info("Re-enabling foreign key checks.")
+        with get_conn() as final_conn:
+            final_conn.execute("PRAGMA foreign_keys = ON")
+            final_conn.commit()
+
+    _renumber_steps(approval_id)
+    logging.info(
+        f"Step order renumbered for approval {approval_id}. Request finished successfully."
+    )
+    return JSONResponse({"ok": True})

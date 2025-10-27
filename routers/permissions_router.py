@@ -1,11 +1,13 @@
-# permissions_router.py
 from typing import Optional, Dict, List
 from fastapi import APIRouter, Request, Form, Cookie
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 import json
+from datetime import datetime
+import os
+import sqlite3  # ← 新增：連到 auth.db
 
 from app_utils import templates, NAV_ITEMS, get_base_context
-from data.db import get_conn, upsert_permission_keys  # ✅ 改成 data.db
+from data.db import get_conn, upsert_permission_keys
 
 router = APIRouter(prefix="/admin/permissions", tags=["Permissions"])
 
@@ -27,6 +29,42 @@ def _flatten_permission_keys(items: List[Dict]) -> List[str]:
     return sorted(keys)
 
 
+# === 你可自由擴充的額外權限鍵（不一定出現在 NAV，但希望出現在畫面） ===
+EXTRA_KEYS: set[str] = {
+    "complaints_manage",
+}
+
+# === 讀寫 auth.db → permissions_keys(key) =====================
+AUTH_DB_PATH = os.getenv("AUTH_DB_PATH", "auth.db")  # 若路徑不同，用環境變數覆蓋
+
+
+def _auth_conn():
+    conn = sqlite3.connect(AUTH_DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _load_perm_keys_from_auth() -> list[str]:
+    with _auth_conn() as a:
+        a.execute("CREATE TABLE IF NOT EXISTS permissions_keys (key TEXT PRIMARY KEY)")
+        rows = a.execute("SELECT key FROM permissions_keys").fetchall()
+    return [r["key"] for r in rows]
+
+
+def _ensure_perm_keys_in_auth(keys: list[str]) -> None:
+    if not keys:
+        return
+    with _auth_conn() as a:
+        a.execute("CREATE TABLE IF NOT EXISTS permissions_keys (key TEXT PRIMARY KEY)")
+        a.executemany(
+            "INSERT OR IGNORE INTO permissions_keys(key) VALUES (?)",
+            [(k,) for k in keys],
+        )
+
+
+# ============================== Pages =========================================
+
+
 @router.get("", response_class=HTMLResponse)
 async def page(
     request: Request,
@@ -34,12 +72,20 @@ async def page(
     role: Optional[str] = Cookie(None),
     permissions: Optional[str] = Cookie(None),
 ):
-    """權限管理首頁（列表 + 勾選權限 + 角色/狀態）"""
     if not user or not _need_admin(role):
         return RedirectResponse(url="/dashboard?error=permission_denied")
 
-    perm_keys = _flatten_permission_keys(NAV_ITEMS)
-    upsert_permission_keys(perm_keys)  # 確保權限鍵有同步到 DB
+    # ⭐ 核心修正：以 DB + NAV + EXTRA 聯集為權限欄位來源
+    db_keys = _load_perm_keys_from_auth()  # auth.db → permissions_keys(key)
+    nav_keys = _flatten_permission_keys(NAV_ITEMS)  # 原本就有的 NAV 鍵
+    perm_keys = sorted(set(db_keys) | set(nav_keys) | EXTRA_KEYS)
+
+    # 把缺的鍵補回 auth.db；同時保留原本對舊表的 upsert（若你的專案需要）
+    _ensure_perm_keys_in_auth(perm_keys)
+    try:
+        upsert_permission_keys(perm_keys)
+    except Exception:
+        pass  # 若另一邊的表結構不同，就不擋頁面
 
     with get_conn() as c:
         users = c.execute(
@@ -56,6 +102,7 @@ async def page(
                 "SELECT perm_key, value FROM user_permissions WHERE user_id=?",
                 (u["id"],),
             ).fetchall()
+            # 預設為未勾選（0），確保每個鍵都有欄位
             perms = {k: 0 for k in perm_keys}
             for r in rows:
                 if r["perm_key"] in perms:
@@ -65,6 +112,9 @@ async def page(
     ctx = get_base_context(request, user, role, permissions)
     ctx.update({"users": data, "perm_keys": perm_keys})
     return templates.TemplateResponse("admin/permissions.html", ctx)
+
+
+# ============================== Update / Disable ==============================
 
 
 @router.post("/update")
@@ -78,12 +128,6 @@ async def update_permissions(
     user: Optional[str] = Cookie(None),
     role: Optional[str] = Cookie(None),
 ):
-    """
-    更新單一使用者的角色/狀態/權限：
-    - role_new: admin/user/guest
-    - status_new: 1=啟用, 0=停用
-    - perms_json: {"report":1,"events":0,...}
-    """
     if not user or not _need_admin(role):
         return RedirectResponse(url="/dashboard?error=permission_denied")
 
@@ -93,7 +137,6 @@ async def update_permissions(
         perms = {}
 
     with get_conn() as c:
-        # 更新 users
         c.execute(
             """
             UPDATE users
@@ -102,8 +145,6 @@ async def update_permissions(
             """,
             (role_new, int(status_new), user_id),
         )
-
-        # 更新 user_permissions
         for k, v in perms.items():
             c.execute(
                 """
@@ -115,6 +156,12 @@ async def update_permissions(
                 (user_id, k, int(v)),
             )
 
+    is_xhr = request.headers.get("x-requested-with", "").lower() in (
+        "fetch",
+        "xmlhttprequest",
+    )
+    if is_xhr:
+        return JSONResponse({"ok": True})
     return RedirectResponse(url="/admin/permissions?ok=1", status_code=303)
 
 
@@ -125,7 +172,6 @@ async def disable_user(
     user: Optional[str] = Cookie(None),
     role: Optional[str] = Cookie(None),
 ):
-    """一鍵停用帳號（status=0）"""
     if not user or not _need_admin(role):
         return RedirectResponse(url="/dashboard?error=permission_denied")
 
@@ -134,4 +180,29 @@ async def disable_user(
             "UPDATE users SET status=0, updated_at=CURRENT_TIMESTAMP WHERE id=?",
             (user_id,),
         )
+
+    is_xhr = request.headers.get("x-requested-with", "").lower() in (
+        "fetch",
+        "xmlhttprequest",
+    )
+    if is_xhr:
+        return JSONResponse({"ok": True})
     return RedirectResponse(url="/admin/permissions?disabled=1", status_code=303)
+
+
+# （以下若與 contracts 附件無關，可保留或移除）
+CONTRACT_ATTACHMENT_DIR = os.path.join("data", "contracts", "attachments")
+
+
+def get_attachment_meta(contract_id: str):
+    os.makedirs(CONTRACT_ATTACHMENT_DIR, exist_ok=True)
+    for filename in os.listdir(CONTRACT_ATTACHMENT_DIR):
+        if filename.startswith(contract_id):
+            path = os.path.join(CONTRACT_ATTACHMENT_DIR, filename)
+            try:
+                mtime = os.path.getmtime(path)
+                mtime_iso = datetime.fromtimestamp(mtime).isoformat(timespec="seconds")
+            except Exception:
+                mtime_iso = None
+            return {"filename": filename, "mtime_iso": mtime_iso}
+    return {"filename": None, "mtime_iso": None}
